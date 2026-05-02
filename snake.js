@@ -750,14 +750,7 @@ class SnakeGame {
       this.state = 'playing';
       this.messageEl.textContent = '';
       this.gameLoop = setInterval(() => this._update(), this.currentSpeed);
-      if (this.options.enableBonusFood && this.bonusFood) {
-        this.bonusFoodInterval = setInterval(() => this._moveBonusFood(), this.currentSpeed + 60);
-        clearTimeout(this.bonusFoodTimeout);
-        this.bonusFoodTimeout = setTimeout(() => {
-          clearInterval(this.bonusFoodInterval);
-          this.bonusFood = null;
-        }, BONUS_FOOD_LIFETIME_MS);
-      }
+      this._resumeCommonTimers();
       return;
     }
 
