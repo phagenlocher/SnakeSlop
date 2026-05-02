@@ -18,11 +18,33 @@ const WALLS = [
   {x:16,y:11},{x:16,y:12},{x:16,y:13},{x:16,y:14},{x:16,y:15},
 ];
 
+// Modes
+const MODE_CLASSIC = 'classic';
+const MODE_TIME_TRIAL = 'timeTrial';
+const MODE_CONSTRICTOR = 'constrictor';
+
+// Colors
+const COLOR_BG = '#0d1a0d';
+const COLOR_WALL_BODY = '#555';
+const COLOR_WALL_EDGE_LIGHT = '#777';
+const COLOR_WALL_EDGE_DARK = '#333';
+const COLOR_SNAKE_WARNING = '#ff6666';
+const COLOR_SNAKE_IGNORED = '#c084fc';
+const COLOR_SNAKE_NORMAL = '#4a7a4a';
+const COLOR_SNAKE_HEAD_IGNORED = '#e2ccff';
+const COLOR_SNAKE_HEAD_WARNING = '#ffaaaa';
+const COLOR_SNAKE_HEAD_NORMAL = '#8ad88a';
+const COLOR_SNAKE_HEAD_BOOST = '#f0e68c';
+const COLOR_FOOD = '#7aff7a';
+const COLOR_FOOD_BONUS = '#FFD700';
+const COLOR_OVERLAY = 'rgba(0, 0, 0, 0.7)';
+const COLOR_OVERLAY_TEXT = '#fff';
+
 class SnakeGame {
   constructor(container, options = {}) {
     this.container = container;
     this.options = {
-      mode: options.mode || 'classic',
+      mode: options.mode || MODE_CLASSIC,
       enableBonusFood: options.enableBonusFood !== undefined ? options.enableBonusFood : true,
       enableGracePeriod: options.enableGracePeriod !== undefined ? options.enableGracePeriod : true,
       enableShrinkOnBonusFood: options.enableShrinkOnBonusFood !== undefined ? options.enableShrinkOnBonusFood : true,
@@ -129,7 +151,7 @@ class SnakeGame {
       this.freeTiles -= WALLS.length;
     }
     this.scoreEl.textContent = 'Score: 0';
-    this.timerEl.textContent = this.options.mode === 'timeTrial' ? 'Time: 2:00' : 'Time: 0:00';
+    this.timerEl.textContent = this.options.mode === MODE_TIME_TRIAL ? 'Time: 2:00' : 'Time: 0:00';
     if (this.bonusEl) this.bonusEl.textContent = 'Bonus: 100';
     this.messageEl.textContent = 'Press any arrow key to start';
     this.overlay.textContent = 'Click to focus';
@@ -146,7 +168,7 @@ class SnakeGame {
     } while (
       this.snake.some(s => s.x === pos.x && s.y === pos.y) ||
       (this.options.enableWalls && WALLS.some(w => w.x === pos.x && w.y === pos.y)) ||
-      (this.options.mode === 'constrictor' && tries < 100 && this._isFoodEnclosed(pos))
+      (this.options.mode === MODE_CONSTRICTOR && tries < 100 && this._isFoodEnclosed(pos))
     );
     this.food = pos;
   }
@@ -185,7 +207,7 @@ class SnakeGame {
     if (next.x >= 0 && next.x < this.COLS && next.y >= 0 && next.y < this.ROWS && !this.snake.some(s => s.x === next.x && s.y === next.y) && !(this.options.enableWalls && WALLS.some(w => w.x === next.x && w.y === next.y))) {
       this.bonusFood = next;
     }
-    if (this.options.mode === 'constrictor' && this.bonusFood && this._isFoodEnclosed(this.bonusFood)) {
+    if (this.options.mode === MODE_CONSTRICTOR && this.bonusFood && this._isFoodEnclosed(this.bonusFood)) {
       this._eatBonusFood();
     }
   }
@@ -304,7 +326,7 @@ class SnakeGame {
   _eatBonusFood() {
     this.score += 100;
     this.scoreEl.textContent = 'Score: ' + this.score;
-    if (this.options.enableShrinkOnBonusFood && this.options.mode !== 'constrictor') {
+    if (this.options.enableShrinkOnBonusFood && this.options.mode !== MODE_CONSTRICTOR) {
       this.snake.splice(Math.ceil(this.snake.length / 2));
     }
     clearInterval(this.bonusFoodInterval);
@@ -314,7 +336,7 @@ class SnakeGame {
 
   _updateTimerDisplay() {
     this.elapsed = Date.now() - this.startTime;
-    if (this.options.mode === 'timeTrial') {
+    if (this.options.mode === MODE_TIME_TRIAL) {
       const remaining = Math.max(0, this.TIME_LIMIT - this.elapsed);
       const secs = Math.floor(remaining / 1000);
       this.timerEl.textContent = 'Time: ' + Math.floor(secs / 60) + ':' + String(secs % 60).padStart(2, '0');
@@ -328,51 +350,51 @@ class SnakeGame {
   }
 
   _draw() {
-    this.ctx.fillStyle = '#0d1a0d';
+    this.ctx.fillStyle = COLOR_BG;
     this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
 
     if (this.options.enableWalls) {
       WALLS.forEach(w => {
-        this.ctx.fillStyle = '#555';
+        this.ctx.fillStyle = COLOR_WALL_BODY;
         this.ctx.fillRect(w.x * this.GRID, w.y * this.GRID, this.GRID, this.GRID);
-        this.ctx.fillStyle = '#777';
+        this.ctx.fillStyle = COLOR_WALL_EDGE_LIGHT;
         this.ctx.fillRect(w.x * this.GRID, w.y * this.GRID, this.GRID - 1, 1);
         this.ctx.fillRect(w.x * this.GRID, w.y * this.GRID, 1, this.GRID - 1);
-        this.ctx.fillStyle = '#333';
+        this.ctx.fillStyle = COLOR_WALL_EDGE_DARK;
         this.ctx.fillRect((w.x + 1) * this.GRID - 1, w.y * this.GRID, 1, this.GRID);
         this.ctx.fillRect(w.x * this.GRID, (w.y + 1) * this.GRID - 1, this.GRID, 1);
       });
     }
 
-    this.ctx.fillStyle = this.state === 'warning' ? '#ff6666' : this.state === 'ignored' ? '#c084fc' : '#4a7a4a';
+    this.ctx.fillStyle = this.state === 'warning' ? COLOR_SNAKE_WARNING : this.state === 'ignored' ? COLOR_SNAKE_IGNORED : COLOR_SNAKE_NORMAL;
     this.snake.forEach((seg) => {
       this.ctx.fillRect(seg.x * this.GRID + 1, seg.y * this.GRID + 1, this.GRID - 2, this.GRID - 2);
     });
 
     if (this.state === 'ignored') {
-      this.ctx.fillStyle = '#e2ccff';
+      this.ctx.fillStyle = COLOR_SNAKE_HEAD_IGNORED;
       const head = this.snake[0];
       this.ctx.fillRect(head.x * this.GRID + 1, head.y * this.GRID + 1, this.GRID - 2, this.GRID - 2);
     } else if (!this.speedBoostActive) {
-      this.ctx.fillStyle = this.state === 'warning' ? '#ffaaaa' : '#8ad88a';
+      this.ctx.fillStyle = this.state === 'warning' ? COLOR_SNAKE_HEAD_WARNING : COLOR_SNAKE_HEAD_NORMAL;
       const head = this.snake[0];
       this.ctx.fillRect(head.x * this.GRID + 1, head.y * this.GRID + 1, this.GRID - 2, this.GRID - 2);
     }
 
     if (this.speedBoostActive) {
-      this.ctx.fillStyle = '#f0e68c';
+      this.ctx.fillStyle = COLOR_SNAKE_HEAD_BOOST;
       const head = this.snake[0];
       this.ctx.fillRect(head.x * this.GRID + 1, head.y * this.GRID + 1, this.GRID - 2, this.GRID - 2);
     }
 
-    this.ctx.fillStyle = '#7aff7a';
+    this.ctx.fillStyle = COLOR_FOOD;
     this.ctx.fillRect(this.food.x * this.GRID + 1, this.food.y * this.GRID + 1, this.GRID - 2, this.GRID - 2);
 
     if (this.options.enableBonusFood && this.bonusFood) {
       const cx = this.bonusFood.x * this.GRID + this.GRID / 2;
       const cy = this.bonusFood.y * this.GRID + this.GRID / 2;
       const r = 8;
-      this.ctx.fillStyle = '#FFD700';
+      this.ctx.fillStyle = COLOR_FOOD_BONUS;
       this.ctx.beginPath();
       this.ctx.moveTo(cx, cy - r);
       this.ctx.lineTo(cx + r, cy);
@@ -383,9 +405,9 @@ class SnakeGame {
     }
 
     if (this.state === 'over') {
-      this.ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+      this.ctx.fillStyle = COLOR_OVERLAY;
       this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
-      this.ctx.fillStyle = '#fff';
+      this.ctx.fillStyle = COLOR_OVERLAY_TEXT;
       this.ctx.font = 'bold 32px Courier New';
       this.ctx.textAlign = 'center';
       this.ctx.textBaseline = 'middle';
@@ -430,7 +452,7 @@ class SnakeGame {
     const hitsSelf = this.snake.some(s => s.x === nextHead.x && s.y === nextHead.y);
 
     if (hitsWall || hitsBoundary || hitsSelf) {
-      if (this.options.mode === 'constrictor' && hitsSelf) {
+      if (this.options.mode === MODE_CONSTRICTOR && hitsSelf) {
         if (this._hasAnySafeMove()) {
           this._enterIgnored();
         } else {
@@ -450,7 +472,7 @@ class SnakeGame {
 
     this.snake.unshift(head);
 
-    if (this.options.mode === 'constrictor') {
+    if (this.options.mode === MODE_CONSTRICTOR) {
       if (head.x === this.food.x && head.y === this.food.y) {
         if (this.snake.length < this.freeTiles) {
           this._placeFood();
@@ -516,7 +538,7 @@ class SnakeGame {
     this.state = 'playing';
     this.startTime = Date.now() - this.elapsed;
     this.messageEl.textContent = '';
-    if (this.options.mode === 'constrictor') {
+    if (this.options.mode === MODE_CONSTRICTOR) {
       this.startGrowth = 14;
     }
     this.gameLoop = setInterval(() => this._update(), this.currentSpeed);
