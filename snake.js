@@ -64,7 +64,8 @@ class SnakeGame {
       enableWalls: options.enableWalls !== undefined ? options.enableWalls : true,
     };
 
-    this.GRID = 25;
+    this.COLS = 20;
+    this.ROWS = 20;
     this.BASE_SPEED = 135;
     this.MIN_SPEED = 50;
     this.SPEED_STEP = 2.4;
@@ -95,8 +96,7 @@ class SnakeGame {
     this.bonusEl = this.container.querySelector('.snake-bonus');
     this.messageEl = this.container.querySelector('.snake-message');
     this.overlay = this.container.querySelector('.snake-focus-overlay');
-    this.COLS = this.canvas.width / this.GRID;
-    this.ROWS = this.canvas.height / this.GRID;
+    this.CELL_SIZE = this.canvas.width / this.COLS;
   }
 
   _bindEvents() {
@@ -399,43 +399,43 @@ class SnakeGame {
     if (this.options.enableWalls) {
       WALLS.forEach(w => {
         this.ctx.fillStyle = COLOR_WALL_BODY;
-        this.ctx.fillRect(w.x * this.GRID, w.y * this.GRID, this.GRID, this.GRID);
+        this.ctx.fillRect(w.x * this.CELL_SIZE, w.y * this.CELL_SIZE, this.CELL_SIZE, this.CELL_SIZE);
         this.ctx.fillStyle = COLOR_WALL_EDGE_LIGHT;
-        this.ctx.fillRect(w.x * this.GRID, w.y * this.GRID, this.GRID - 1, 1);
-        this.ctx.fillRect(w.x * this.GRID, w.y * this.GRID, 1, this.GRID - 1);
+        this.ctx.fillRect(w.x * this.CELL_SIZE, w.y * this.CELL_SIZE, this.CELL_SIZE - 1, 1);
+        this.ctx.fillRect(w.x * this.CELL_SIZE, w.y * this.CELL_SIZE, 1, this.CELL_SIZE - 1);
         this.ctx.fillStyle = COLOR_WALL_EDGE_DARK;
-        this.ctx.fillRect((w.x + 1) * this.GRID - 1, w.y * this.GRID, 1, this.GRID);
-        this.ctx.fillRect(w.x * this.GRID, (w.y + 1) * this.GRID - 1, this.GRID, 1);
+        this.ctx.fillRect((w.x + 1) * this.CELL_SIZE - 1, w.y * this.CELL_SIZE, 1, this.CELL_SIZE);
+        this.ctx.fillRect(w.x * this.CELL_SIZE, (w.y + 1) * this.CELL_SIZE - 1, this.CELL_SIZE, 1);
       });
     }
 
     this.ctx.fillStyle = this.state === 'warning' ? COLOR_SNAKE_WARNING : this.state === 'ignored' ? COLOR_SNAKE_IGNORED : COLOR_SNAKE_NORMAL;
     this.snake.forEach((seg) => {
-      this.ctx.fillRect(seg.x * this.GRID + 1, seg.y * this.GRID + 1, this.GRID - 2, this.GRID - 2);
+      this.ctx.fillRect(seg.x * this.CELL_SIZE + 1, seg.y * this.CELL_SIZE + 1, this.CELL_SIZE - 2, this.CELL_SIZE - 2);
     });
 
     if (this.state === 'ignored') {
       this.ctx.fillStyle = COLOR_SNAKE_HEAD_IGNORED;
       const head = this.snake[0];
-      this.ctx.fillRect(head.x * this.GRID + 1, head.y * this.GRID + 1, this.GRID - 2, this.GRID - 2);
+      this.ctx.fillRect(head.x * this.CELL_SIZE + 1, head.y * this.CELL_SIZE + 1, this.CELL_SIZE - 2, this.CELL_SIZE - 2);
     } else if (!this.speedBoostActive) {
       this.ctx.fillStyle = this.state === 'warning' ? COLOR_SNAKE_HEAD_WARNING : COLOR_SNAKE_HEAD_NORMAL;
       const head = this.snake[0];
-      this.ctx.fillRect(head.x * this.GRID + 1, head.y * this.GRID + 1, this.GRID - 2, this.GRID - 2);
+      this.ctx.fillRect(head.x * this.CELL_SIZE + 1, head.y * this.CELL_SIZE + 1, this.CELL_SIZE - 2, this.CELL_SIZE - 2);
     }
 
     if (this.speedBoostActive) {
       this.ctx.fillStyle = COLOR_SNAKE_HEAD_BOOST;
       const head = this.snake[0];
-      this.ctx.fillRect(head.x * this.GRID + 1, head.y * this.GRID + 1, this.GRID - 2, this.GRID - 2);
+      this.ctx.fillRect(head.x * this.CELL_SIZE + 1, head.y * this.CELL_SIZE + 1, this.CELL_SIZE - 2, this.CELL_SIZE - 2);
     }
 
     this.ctx.fillStyle = COLOR_FOOD;
-    this.ctx.fillRect(this.food.x * this.GRID + 1, this.food.y * this.GRID + 1, this.GRID - 2, this.GRID - 2);
+    this.ctx.fillRect(this.food.x * this.CELL_SIZE + 1, this.food.y * this.CELL_SIZE + 1, this.CELL_SIZE - 2, this.CELL_SIZE - 2);
 
     if (this.options.enableBonusFood && this.bonusFood) {
-      const cx = this.bonusFood.x * this.GRID + this.GRID / 2;
-      const cy = this.bonusFood.y * this.GRID + this.GRID / 2;
+      const cx = this.bonusFood.x * this.CELL_SIZE + this.CELL_SIZE / 2;
+      const cy = this.bonusFood.y * this.CELL_SIZE + this.CELL_SIZE / 2;
       const r = 8;
       this.ctx.fillStyle = COLOR_FOOD_BONUS;
       this.ctx.beginPath();
