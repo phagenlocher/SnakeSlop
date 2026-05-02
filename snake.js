@@ -35,7 +35,7 @@ class SnakeGame {
       enableWalls: options.enableWalls !== undefined ? options.enableWalls : true,
     };
 
-    this.GRID = 20;
+    this.GRID = 25;
     this.BASE_SPEED = 135;
     this.MIN_SPEED = 50;
     this.SPEED_STEP = 2.4;
@@ -54,7 +54,7 @@ class SnakeGame {
           ${this.options.enableScoreBonus ? '<span class="snake-bonus">Bonus: 0</span>' : ''}
           <span class="snake-timer">Time: 0:00</span>
         </div>
-        <div class="snake-game-wrapper"><canvas class="snake-canvas" width="400" height="400" tabindex="0"></canvas><div class="snake-focus-overlay">Click to focus</div></div>
+        <div class="snake-game-wrapper"><canvas class="snake-canvas" width="500" height="500" tabindex="0"></canvas><div class="snake-focus-overlay">Click to focus</div></div>
         <div class="snake-message">Press any arrow key to start</div>
       </div>
     `;
