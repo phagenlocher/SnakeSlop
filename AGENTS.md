@@ -41,11 +41,11 @@ Food is eaten by enclosure, not head collision.
 - **Auto-growth**: Snake starts at length 1. On game start, `startGrowth = 14` auto-grows the snake to length 15 over the first ~14 ticks (no food required).
 - **Self-collision**: Running into your own body does not kill the snake. Instead, the game enters the `ignored` state — the snake freezes, turns magenta (`#c084fc` body, `#e2ccff` head), and waits indefinitely for the player to press a safe direction. If no safe direction exists (all adjacent cells are blocked by walls, boundaries, or the snake's own body), the game ends immediately via `_hasAnySafeMove()`.
 - **Head hits food** (regular): The food disappears (poofs) and is replaced at a random **non-enclosed** position. No score, no growth. Guarded by `snake.length < freeTiles` to prevent board-full infinite loops.
-- **Head hits bonus food**: No effect — bonus food is enclosure-only.
-- **Enclosure eating** (regular food): Flood-fill BFS from the food through non-snake, non-wall cells. In non-wrap mode, if the flood fill cannot reach the grid boundary, the food is enclosed. In wrap mode, the flood fill wraps (modulo), and all connected components of free cells are compared — the food is enclosed if its component is smaller than the largest component (the "outside" region). Eating by enclosure awards 10 pts + bonus score, speed up, and `foodsEaten++`. The snake never grows from eating food — length stays constant at 15 after auto-growth.
-- **Enclosure eating** (bonus food): Same flood-fill check. Awards 100 pts, clears bonus timers. Shrink is disabled in constrictor mode. Also checked in `_moveBonusFood()` after each random step.
+- **Head hits bonus food**: No effect — bonus food is enclosure-only. Eating bonus food by enclosure shrinks the snake (halved, minimum length 15).
+- **Enclosure eating** (regular food): Flood-fill BFS from the food through non-snake, non-wall cells. In non-wrap mode, if the flood fill cannot reach the grid boundary, the food is enclosed. In wrap mode, the flood fill wraps (modulo), and all connected components of free cells are compared — the food is enclosed if its component is smaller than the largest component (the "outside" region). Eating by enclosure awards 10 pts + bonus score, speed up, `foodsEaten++`, and grows the snake by 1 segment.
+- **Enclosure eating** (bonus food): Same flood-fill check. Awards 100 pts, clears bonus timers, and shrinks the snake (halved, minimum length 15). Also checked in `_moveBonusFood()` after each random step.
 - **Food placement**: `_placeFood()` rejects positions that are already enclosed (max 100 retries), ensuring food always spawns in the outside region.
-- **All Classic rules apply**: Grace period, speed boost, bonus food, walls, wrap, etc. all function identically, except `enableShrinkOnBonusFood` which is ignored and self-collision which enters the `ignored` state instead of warning/game over (grace period toggle has no effect on self-collision). Bonus food moves, expires, and follows the same timing rules — only the eating mechanic (enclosure vs head) differs.
+- **All Classic rules apply**: Grace period, speed boost, bonus food, walls, wrap, etc. all function identically, except self-collision which enters the `ignored` state instead of warning/game over (grace period toggle has no effect on self-collision). Bonus food moves, expires, and follows the same timing rules — only the eating mechanic (enclosure vs head) differs.
 
 ## Togglable Features
 
@@ -82,7 +82,7 @@ Enables a 1-second warning/grace period before game over when the snake is about
 
 Controls whether the snake shrinks when eating bonus food.
 
-- **Behavior**: When bonus food is eaten, the snake's length is halved via `this.snake.splice(Math.ceil(this.snake.length / 2))`, removing the tail half. Any pending `growth` counter is unaffected (the snake will still grow by remaining ticks if `growth > 0`). Note: This option is ignored in constrictor mode — bonus food never shrinks the snake.
+- **Behavior**: When bonus food is eaten, the snake's length is halved via `this.snake.splice(Math.ceil(this.snake.length / 2))`, removing the tail half. Any pending `growth` counter is unaffected (the snake will still grow by remaining ticks if `growth > 0`). In constrictor mode, shrinking is capped at a minimum length of 15.
 - **Dependency**: Only has effect when `enableBonusFood` is also enabled and mode is not `constrictor` (bonus food must exist to be eaten).
 - **When disabled**: Eating bonus food still awards 100 points and clears the bonus food, but the snake retains its full length.
 

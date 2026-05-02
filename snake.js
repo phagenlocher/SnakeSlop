@@ -326,8 +326,11 @@ class SnakeGame {
   _eatBonusFood() {
     this.score += 100;
     this.scoreEl.textContent = 'Score: ' + this.score;
-    if (this.options.enableShrinkOnBonusFood && this.options.mode !== MODE_CONSTRICTOR) {
-      this.snake.splice(Math.ceil(this.snake.length / 2));
+    if (this.options.enableShrinkOnBonusFood) {
+      const shrunkLen = Math.ceil(this.snake.length / 2);
+      if (this.options.mode !== MODE_CONSTRICTOR || shrunkLen >= 15) {
+        this.snake.splice(shrunkLen);
+      }
     }
     clearInterval(this.bonusFoodInterval);
     clearTimeout(this.bonusFoodTimeout);
@@ -481,6 +484,8 @@ class SnakeGame {
 
       if (this.startGrowth > 0) {
         this.startGrowth--;
+      } else if (this.growth > 0) {
+        this.growth--;
       } else {
         this.snake.pop();
       }
