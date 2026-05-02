@@ -73,9 +73,10 @@ body {
 .snake-toggle-group {
   margin-bottom: 16px;
 }
-.snake-toggle-group h3 {
+.snake-toggle-heading {
   margin-bottom: 8px;
-  font-size: 17px;
+  font-size: 18px;
+  font-weight: bold;
   letter-spacing: 1px;
   color: #4a7a4a;
 }
@@ -97,7 +98,7 @@ body {
   cursor: pointer;
 }
 .snake-features-details summary {
-  font-size: 17px;
+  font-size: 20px;
   letter-spacing: 1px;
   cursor: pointer;
 }
