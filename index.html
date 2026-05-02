@@ -36,7 +36,7 @@ You should have received a copy of the CC0 Public Domain Dedication along with t
       <div class="snake-toggle-grid">
         <label title="Golden diamond worth 100pts, appears every 15s and moves randomly"><input type="checkbox" class="snake-toggle-bonus-food" checked> Bonus Food</label>
         <label title="Bonus food spawns every 15 seconds instead of every 5 foods eaten"><input type="checkbox" class="snake-toggle-timed-bonus" checked> Timed Bonus Food</label>
-        <label title="Snake shrinks by half when eating bonus food"><input type="checkbox" class="snake-toggle-shrink" checked> Shrink on Bonus Food</label>
+        <label class="snake-toggle-shrink-label" title="Snake shrinks by half when eating bonus food (ignored in Constrictor mode)"><input type="checkbox" class="snake-toggle-shrink" checked> Shrink on Bonus Food</label>
         <label title="Decaying bonus multiplier added to score when eating food"><input type="checkbox" class="snake-toggle-score-bonus" checked> Score Bonus</label>
       </div>
     </div>
@@ -96,6 +96,10 @@ function saveSettings() {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
 }
 
+function updateDisabledFeatures(mode) {
+  document.querySelector('.snake-toggle-shrink-label').classList.toggle('snake-feature-disabled', mode === 'constrictor');
+}
+
 function loadSettings() {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
@@ -134,6 +138,7 @@ function mountGame() {
     enableTimedBonusFood: toggleTimedBonus.checked,
     enableWalls: toggleWalls.checked,
   });
+  updateDisabledFeatures(modeSelect.value);
   saveSettings();
 }
 

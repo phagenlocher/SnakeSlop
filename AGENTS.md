@@ -38,13 +38,13 @@ Food is eaten by enclosure, not head collision.
 - **Timer**: Counts up from `0:00` in the HUD as `Time: M:SS` (same as Classic).
 - **Game over**: Triggered by collision (wall, boundary, or self) or when the snake completely fills the playable area. No time limit.
 - **Final score**: Displayed on the canvas overlay ("GAME OVER" + "Score: X") and in the message text below.
-- **Auto-growth**: Snake starts at length 1. On game start, `startGrowth = 9` auto-grows the snake to length 10 over the first ~9 ticks (no food required).
+- **Auto-growth**: Snake starts at length 1. On game start, `startGrowth = 14` auto-grows the snake to length 15 over the first ~14 ticks (no food required).
 - **Head hits food** (regular): The food disappears (poofs) and is replaced at a random **non-enclosed** position. No score, no growth. Guarded by `snake.length < freeTiles` to prevent board-full infinite loops.
 - **Head hits bonus food**: No effect — bonus food is enclosure-only.
-- **Enclosure eating** (regular food): Flood-fill BFS from the food through non-snake, non-wall cells. In non-wrap mode, if the flood fill cannot reach the grid boundary, the food is enclosed. In wrap mode, the flood fill wraps (modulo), and all connected components of free cells are compared — the food is enclosed if its component is smaller than the largest component (the "outside" region). Eating by enclosure awards 10 pts + bonus score, `growth = 1`, speed up, and `foodsEaten++`.
-- **Enclosure eating** (bonus food): Same flood-fill check. Awards 100 pts, optional shrink, clears bonus timers. Also checked in `_moveBonusFood()` after each random step.
+- **Enclosure eating** (regular food): Flood-fill BFS from the food through non-snake, non-wall cells. In non-wrap mode, if the flood fill cannot reach the grid boundary, the food is enclosed. In wrap mode, the flood fill wraps (modulo), and all connected components of free cells are compared — the food is enclosed if its component is smaller than the largest component (the "outside" region). Eating by enclosure awards 10 pts + bonus score, speed up, and `foodsEaten++`. The snake never grows from eating food — length stays constant at 15 after auto-growth.
+- **Enclosure eating** (bonus food): Same flood-fill check. Awards 100 pts, clears bonus timers. Shrink is disabled in constrictor mode. Also checked in `_moveBonusFood()` after each random step.
 - **Food placement**: `_placeFood()` rejects positions that are already enclosed (max 100 retries), ensuring food always spawns in the outside region.
-- **All Classic rules apply**: Grace period, speed boost, bonus food, walls, wrap, etc. all function identically. Bonus food moves, expires, and follows the same timing rules — only the eating mechanic (enclosure vs head) differs.
+- **All Classic rules apply**: Grace period, speed boost, bonus food, walls, wrap, etc. all function identically, except `enableShrinkOnBonusFood` which is ignored. Bonus food moves, expires, and follows the same timing rules — only the eating mechanic (enclosure vs head) differs.
 
 ## Togglable Features
 
@@ -80,8 +80,8 @@ Enables a 1-second warning/grace period before game over when the snake is about
 
 Controls whether the snake shrinks when eating bonus food.
 
-- **Behavior**: When bonus food is eaten, the snake's length is halved via `this.snake.splice(Math.ceil(this.snake.length / 2))`, removing the tail half. Any pending `growth` counter is unaffected (the snake will still grow by remaining ticks if `growth > 0`).
-- **Dependency**: Only has effect when `enableBonusFood` is also enabled (bonus food must exist to be eaten).
+- **Behavior**: When bonus food is eaten, the snake's length is halved via `this.snake.splice(Math.ceil(this.snake.length / 2))`, removing the tail half. Any pending `growth` counter is unaffected (the snake will still grow by remaining ticks if `growth > 0`). Note: This option is ignored in constrictor mode — bonus food never shrinks the snake.
+- **Dependency**: Only has effect when `enableBonusFood` is also enabled and mode is not `constrictor` (bonus food must exist to be eaten).
 - **When disabled**: Eating bonus food still awards 100 points and clears the bonus food, but the snake retains its full length.
 
 ### `enableSpeedUp` (default: `true`)
@@ -177,7 +177,7 @@ Enables static walls arranged as a hollow square ring with openings in the cente
 - **Snake data**: array of `{x, y}` — `unshift` head, `pop` tail (skip pop when eating food); eating regular food sets `growth = 2`, causing the snake to grow by 2 segments over the next 2 ticks
 - **Board-full detection**: `freeTiles` is computed in `init()` as `COLS * ROWS` minus wall count. After each food eaten, `snake.length` is compared against `freeTiles`; if equal or greater, `_gameOver()` is called immediately (bypassing grace period).
 - **Food placement**: random grid position, retries if overlapping snake body
-- **Bonus food**: golden diamond, appears every 15 seconds, worth 100pts, moves randomly at `(currentSpeed + 60)`ms intervals, expires after 5s; eating it shrinks snake by half via `splice(Math.ceil(length / 2))`
+- **Bonus food**: golden diamond, appears every 15 seconds, worth 100pts, moves randomly at `(currentSpeed + 60)`ms intervals, expires after 5s; eating it shrinks snake by half via `splice(Math.ceil(length / 2))` (shrinking disabled in constrictor mode)
 - **Pause/Resume**: canvas `focus`/`blur` events with a `focus-overlay` div; all timers cleared on pause, restored on resume with remaining time recalculated
 - **Reversal guard**: player cannot reverse direction in a single tick
 - **Game over overlay**: Semi-transparent dark overlay with "GAME OVER" and "Score: X" drawn on canvas when `state === 'over'`

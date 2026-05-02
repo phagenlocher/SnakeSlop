@@ -123,6 +123,10 @@ hr + .snake-features-details {
 .snake-mode-selector label {
   color: #4a7a4a;
 }
+.snake-feature-disabled {
+  text-decoration: line-through;
+  opacity: 0.5;
+}
 .snake-mode-select {
   background: #1a1a1a;
   color: #4a7a4a;

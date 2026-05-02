@@ -10,7 +10,7 @@ Open `index.html` in any browser to play.
 |---|---|
 | Classic | Standard Snake. Timer counts up, no time limit. Game over on collision or when the board is completely filled. |
 | Time Trial | Race against the clock. Timer counts down from 2:00. Game over when time runs out, on collision, or when the board is completely filled. All Classic rules apply. |
-| Constrictor | Food is eaten by enclosure, not head collision. Snake auto-grows to length 10 at start. Head passing over food poofs it away (no score/growth). Bonus food also enclosure-only. All Classic rules apply. |
+| Constrictor | Food is eaten by enclosure, not head collision. Snake auto-grows to length 15 at start and never changes length. Head passing over food poofs it away (no score/growth). Bonus food also enclosure-only, but shrink is disabled. All Classic rules apply except `enableShrinkOnBonusFood`, which is ignored. |
 
 ## Togglable Features
 
@@ -20,7 +20,7 @@ Checkboxes in the UI control which mechanics are active. The game is destroyed a
 |---|---|---|
 | Bonus Food | On | A golden diamond appears every 15 seconds. Worth 100 points, moves around, expires after 5 seconds. |
 | Grace Period | On | When about to collide, the snake turns red and you have 1 second to dodge with a safe direction key. |
-| Shrink on Bonus Food | On | Eating bonus food cuts the snake's length in half. (Only matters if bonus food is enabled.) |
+| Shrink on Bonus Food | On | Eating bonus food cuts the snake's length in half. (Only matters if bonus food is enabled. Ignored in Constrictor mode.) |
 | Speed Up | On | The game speeds up by 2.4 ms per food eaten (starts at 135 ms, floors at 50 ms). |
 | Score Bonus | On | A decaying bonus score (starts at 100, drops by 5/s) that adds extra points when you eat regular food. |
 | Wrap Around | On | Snake teleports to the opposite wall instead of dying at boundaries. |

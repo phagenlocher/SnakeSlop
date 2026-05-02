@@ -288,7 +288,7 @@ class SnakeGame {
   _eatBonusFood() {
     this.score += 100;
     this.scoreEl.textContent = 'Score: ' + this.score;
-    if (this.options.enableShrinkOnBonusFood) {
+    if (this.options.enableShrinkOnBonusFood && this.options.mode !== 'constrictor') {
       this.snake.splice(Math.ceil(this.snake.length / 2));
     }
     clearInterval(this.bonusFoodInterval);
@@ -431,8 +431,6 @@ class SnakeGame {
 
       if (this.startGrowth > 0) {
         this.startGrowth--;
-      } else if (this.growth > 0) {
-        this.growth--;
       } else {
         this.snake.pop();
       }
@@ -481,7 +479,7 @@ class SnakeGame {
     this.startTime = Date.now() - this.elapsed;
     this.messageEl.textContent = '';
     if (this.options.mode === 'constrictor') {
-      this.startGrowth = 9;
+      this.startGrowth = 14;
     }
     this.gameLoop = setInterval(() => this._update(), this.currentSpeed);
     this.timerInterval = setInterval(() => this._updateTimerDisplay(), 1000);
