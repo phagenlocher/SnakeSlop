@@ -122,6 +122,7 @@ class SnakeGame {
     this.inputBuffer = [];
     this.graceDirection = { x: 0, y: 0 };
     this.growth = 0;
+    this.startGrowth = 0;
     this._clearAllTimers();
     this.freeTiles = this.COLS * this.ROWS;
     if (this.options.enableWalls) {
@@ -138,9 +139,15 @@ class SnakeGame {
 
   _placeFood() {
     let pos;
+    let tries = 0;
     do {
       pos = { x: Math.floor(Math.random() * this.COLS), y: Math.floor(Math.random() * this.ROWS) };
-    } while (this.snake.some(s => s.x === pos.x && s.y === pos.y) || (this.options.enableWalls && WALLS.some(w => w.x === pos.x && w.y === pos.y)));
+      tries++;
+    } while (
+      this.snake.some(s => s.x === pos.x && s.y === pos.y) ||
+      (this.options.enableWalls && WALLS.some(w => w.x === pos.x && w.y === pos.y)) ||
+      (this.options.mode === 'constrictor' && tries < 100 && this._isFoodEnclosed(pos))
+    );
     this.food = pos;
   }
 
@@ -178,6 +185,9 @@ class SnakeGame {
     if (next.x >= 0 && next.x < this.COLS && next.y >= 0 && next.y < this.ROWS && !this.snake.some(s => s.x === next.x && s.y === next.y) && !(this.options.enableWalls && WALLS.some(w => w.x === next.x && w.y === next.y))) {
       this.bonusFood = next;
     }
+    if (this.options.mode === 'constrictor' && this.bonusFood && this._isFoodEnclosed(this.bonusFood)) {
+      this._eatBonusFood();
+    }
   }
 
   _startBonusDecay() {
@@ -189,6 +199,101 @@ class SnakeGame {
         clearInterval(this.scoreBonusInterval);
       }
     }, 200);
+  }
+
+  _isFoodEnclosed(pos) {
+    const key = (x, y) => x + ',' + y;
+    const snakeSet = new Set(this.snake.map(s => key(s.x, s.y)));
+    const wallSet = this.options.enableWalls ? new Set(WALLS.map(w => key(w.x, w.y))) : new Set();
+    const isBlocked = (x, y) => snakeSet.has(key(x, y)) || wallSet.has(key(x, y));
+    const wrap = this.options.enableWrap;
+
+    const floodSize = (sx, sy, visited) => {
+      let size = 0;
+      const q = [{ x: sx, y: sy }];
+      visited.add(key(sx, sy));
+      while (q.length) {
+        const { x, y } = q.shift();
+        size++;
+        for (const [dx, dy] of [[0, 1], [0, -1], [1, 0], [-1, 0]]) {
+          let nx = x + dx, ny = y + dy;
+          if (wrap) {
+            nx = (nx + this.COLS) % this.COLS;
+            ny = (ny + this.ROWS) % this.ROWS;
+          } else if (nx < 0 || nx >= this.COLS || ny < 0 || ny >= this.ROWS) {
+            continue;
+          }
+          const k = key(nx, ny);
+          if (visited.has(k) || isBlocked(nx, ny)) continue;
+          visited.add(k);
+          q.push({ x: nx, y: ny });
+        }
+      }
+      return size;
+    };
+
+    const visited = new Set();
+    const foodSize = floodSize(pos.x, pos.y, visited);
+
+    if (!wrap) {
+      for (const k of visited) {
+        const [xs, ys] = k.split(',');
+        if (+xs === 0 || +xs === this.COLS - 1 || +ys === 0 || +ys === this.ROWS - 1) return false;
+      }
+      return true;
+    }
+
+    let largestOther = 0;
+    for (let y = 0; y < this.ROWS; y++) {
+      for (let x = 0; x < this.COLS; x++) {
+        const k = key(x, y);
+        if (visited.has(k) || isBlocked(x, y)) continue;
+        const sz = floodSize(x, y, visited);
+        if (sz > largestOther) largestOther = sz;
+      }
+    }
+    return foodSize < largestOther;
+  }
+
+  _eatRegularFood() {
+    if (this.options.enableScoreBonus && this.scoreBonus > 0) {
+      this.score += this.scoreBonus;
+      this.scoreEl.textContent = 'Score: ' + this.score;
+    }
+    if (this.options.enableScoreBonus) {
+      this.scoreBonus = 100;
+      if (this.bonusEl) this.bonusEl.textContent = 'Bonus: ' + this.scoreBonus;
+      this._startBonusDecay();
+    }
+    this.score += 10;
+    this.scoreEl.textContent = 'Score: ' + this.score;
+    this.foodsEaten++;
+    this.growth = 1;
+    if (this.snake.length >= this.freeTiles) {
+      this._gameOver();
+      return true;
+    }
+    if (this.options.enableBonusFood && !this.options.enableTimedBonusFood && this.foodsEaten % 5 === 0 && !this.bonusFood) {
+      this._placeBonusFood();
+    }
+    this._placeFood();
+    if (this.options.enableSpeedUp && this.currentSpeed > this.MIN_SPEED) {
+      this.currentSpeed = Math.max(this.MIN_SPEED, this.currentSpeed - this.SPEED_STEP);
+      clearInterval(this.gameLoop);
+      this.gameLoop = setInterval(() => this._update(), this.speedBoostActive ? this.currentSpeed / 1.35 : this.currentSpeed);
+    }
+    return false;
+  }
+
+  _eatBonusFood() {
+    this.score += 100;
+    this.scoreEl.textContent = 'Score: ' + this.score;
+    if (this.options.enableShrinkOnBonusFood) {
+      this.snake.splice(Math.ceil(this.snake.length / 2));
+    }
+    clearInterval(this.bonusFoodInterval);
+    clearTimeout(this.bonusFoodTimeout);
+    this.bonusFood = null;
   }
 
   _updateTimerDisplay() {
@@ -317,50 +422,42 @@ class SnakeGame {
 
     this.snake.unshift(head);
 
-    if (head.x === this.food.x && head.y === this.food.y) {
-      if (this.options.enableScoreBonus && this.scoreBonus > 0) {
-        this.score += this.scoreBonus;
-        this.scoreEl.textContent = 'Score: ' + this.score;
+    if (this.options.mode === 'constrictor') {
+      if (head.x === this.food.x && head.y === this.food.y) {
+        if (this.snake.length < this.freeTiles) {
+          this._placeFood();
+        }
       }
-      if (this.options.enableScoreBonus) {
-    this.scoreBonus = 100;
-      if (this.bonusEl) this.bonusEl.textContent = 'Bonus: ' + this.scoreBonus;
-        this._startBonusDecay();
-      }
-      this.score += 10;
-      this.scoreEl.textContent = 'Score: ' + this.score;
-      this.foodsEaten++;
-      this.growth = 1;
-      if (this.snake.length >= this.freeTiles) {
-        this._gameOver();
-        return;
-      }
-      if (this.options.enableBonusFood && !this.options.enableTimedBonusFood && this.foodsEaten % 5 === 0 && !this.bonusFood) {
-        this._placeBonusFood();
-      }
-      this._placeFood();
-      if (this.options.enableSpeedUp && this.currentSpeed > this.MIN_SPEED) {
-        this.currentSpeed = Math.max(this.MIN_SPEED, this.currentSpeed - this.SPEED_STEP);
-        clearInterval(this.gameLoop);
-        this.gameLoop = setInterval(() => this._update(), this.speedBoostActive ? this.currentSpeed / 1.35 : this.currentSpeed);
-      }
-    } else {
-      if (this.growth > 0) {
+
+      if (this.startGrowth > 0) {
+        this.startGrowth--;
+      } else if (this.growth > 0) {
         this.growth--;
       } else {
         this.snake.pop();
       }
-    }
 
-    if (this.options.enableBonusFood && this.bonusFood && head.x === this.bonusFood.x && head.y === this.bonusFood.y) {
-      this.score += 100;
-      this.scoreEl.textContent = 'Score: ' + this.score;
-      if (this.options.enableShrinkOnBonusFood) {
-        this.snake.splice(Math.ceil(this.snake.length / 2));
+      if (this._isFoodEnclosed(this.food)) {
+        if (this._eatRegularFood()) return;
       }
-      clearInterval(this.bonusFoodInterval);
-      clearTimeout(this.bonusFoodTimeout);
-      this.bonusFood = null;
+
+      if (this.options.enableBonusFood && this.bonusFood && this._isFoodEnclosed(this.bonusFood)) {
+        this._eatBonusFood();
+      }
+    } else {
+      if (head.x === this.food.x && head.y === this.food.y) {
+        if (this._eatRegularFood()) return;
+      } else {
+        if (this.growth > 0) {
+          this.growth--;
+        } else {
+          this.snake.pop();
+        }
+      }
+
+      if (this.options.enableBonusFood && this.bonusFood && head.x === this.bonusFood.x && head.y === this.bonusFood.y) {
+        this._eatBonusFood();
+      }
     }
 
     this._draw();
@@ -383,6 +480,9 @@ class SnakeGame {
     this.state = 'playing';
     this.startTime = Date.now() - this.elapsed;
     this.messageEl.textContent = '';
+    if (this.options.mode === 'constrictor') {
+      this.startGrowth = 9;
+    }
     this.gameLoop = setInterval(() => this._update(), this.currentSpeed);
     this.timerInterval = setInterval(() => this._updateTimerDisplay(), 1000);
     if (this.options.enableScoreBonus && this.scoreBonus > 0) {

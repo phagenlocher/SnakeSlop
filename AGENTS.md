@@ -31,6 +31,21 @@ Race against the clock.
 - **Final score**: Displayed on the canvas overlay ("GAME OVER" + "Score: X") and in the message text below.
 - **All Classic rules apply**: Grace period, speed boost, bonus food, walls, wrap, etc. all function identically.
 
+### `constrictor`
+
+Food is eaten by enclosure, not head collision.
+
+- **Timer**: Counts up from `0:00` in the HUD as `Time: M:SS` (same as Classic).
+- **Game over**: Triggered by collision (wall, boundary, or self) or when the snake completely fills the playable area. No time limit.
+- **Final score**: Displayed on the canvas overlay ("GAME OVER" + "Score: X") and in the message text below.
+- **Auto-growth**: Snake starts at length 1. On game start, `startGrowth = 9` auto-grows the snake to length 10 over the first ~9 ticks (no food required).
+- **Head hits food** (regular): The food disappears (poofs) and is replaced at a random **non-enclosed** position. No score, no growth. Guarded by `snake.length < freeTiles` to prevent board-full infinite loops.
+- **Head hits bonus food**: No effect — bonus food is enclosure-only.
+- **Enclosure eating** (regular food): Flood-fill BFS from the food through non-snake, non-wall cells. In non-wrap mode, if the flood fill cannot reach the grid boundary, the food is enclosed. In wrap mode, the flood fill wraps (modulo), and all connected components of free cells are compared — the food is enclosed if its component is smaller than the largest component (the "outside" region). Eating by enclosure awards 10 pts + bonus score, `growth = 1`, speed up, and `foodsEaten++`.
+- **Enclosure eating** (bonus food): Same flood-fill check. Awards 100 pts, optional shrink, clears bonus timers. Also checked in `_moveBonusFood()` after each random step.
+- **Food placement**: `_placeFood()` rejects positions that are already enclosed (max 100 retries), ensuring food always spawns in the outside region.
+- **All Classic rules apply**: Grace period, speed boost, bonus food, walls, wrap, etc. all function identically. Bonus food moves, expires, and follows the same timing rules — only the eating mechanic (enclosure vs head) differs.
+
 ## Togglable Features
 
 All features are controlled via checkboxes in `index.html` and passed as options to `SnakeGame(container, options)`. The game is destroyed and remounted whenever any toggle changes.
@@ -149,10 +164,10 @@ Enables static walls arranged as a hollow square ring with openings in the cente
 
 - **Files**:
   - `index.html` — markup, mode selector, feature toggles, and game mounting logic
-  - `snake.js` — `SnakeGame` class (~450 lines)
-  - `snake.css` — styles (~96 lines)
+  - `snake.js` — `SnakeGame` class
+  - `snake.css` — styles
 - **Class-based**: `SnakeGame` class with `constructor(container, options)`, `init()`, `destroy()`, `_buildDOM()`, `_bindEvents()`
-- **Options**: `mode` (`'classic'` or `'timeTrial'`), `enableBonusFood`, `enableGracePeriod`, `enableShrinkOnBonusFood`, `enableSpeedUp`, `enableScoreBonus`, `enableWrap`, `enableSpeedBoost`, `enableInputBuffer`, `enableTimedBonusFood`, `enableWalls` — toggled via UI; game remounts on change
+- **Options**: `mode` (`'classic'`, `'timeTrial'`, or `'constrictor'`), `enableBonusFood`, `enableGracePeriod`, `enableShrinkOnBonusFood`, `enableSpeedUp`, `enableScoreBonus`, `enableWrap`, `enableSpeedBoost`, `enableInputBuffer`, `enableTimedBonusFood`, `enableWalls` — toggled via UI; game remounts on change
 - **Canvas**: 400×400px, grid size `GRID=20`, columns/rows computed from canvas dimensions
 - **HUD**: Score display + bonus score + timer (`Time: M:SS`)
 - **State machine**: `waiting` → `playing` → `warning` → `over` (space restarts to `waiting`); pause/resume via canvas focus/blur
