@@ -8,8 +8,8 @@ Open `index.html` in any browser to play.
 
 | Mode | Description |
 |---|---|
-| Classic | Standard Snake. Timer counts up, no time limit. Game over on collision. |
-| Time Trial | Race against the clock. Timer counts down from 2:00. Game over when time runs out OR on collision. All Classic rules apply. |
+| Classic | Standard Snake. Timer counts up, no time limit. Game over on collision or when the board is completely filled. |
+| Time Trial | Race against the clock. Timer counts down from 2:00. Game over when time runs out, on collision, or when the board is completely filled. All Classic rules apply. |
 
 ## Togglable Features
 

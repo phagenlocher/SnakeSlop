@@ -123,6 +123,10 @@ class SnakeGame {
     this.graceDirection = { x: 0, y: 0 };
     this.growth = 0;
     this._clearAllTimers();
+    this.freeTiles = this.COLS * this.ROWS;
+    if (this.options.enableWalls) {
+      this.freeTiles -= WALLS.length;
+    }
     this.scoreEl.textContent = 'Score: 0';
     this.timerEl.textContent = this.options.mode === 'timeTrial' ? 'Time: 2:00' : 'Time: 0:00';
     this.bonusEl.textContent = 'Bonus: 100';
@@ -327,6 +331,10 @@ class SnakeGame {
       this.scoreEl.textContent = 'Score: ' + this.score;
       this.foodsEaten++;
       this.growth = 1;
+      if (this.snake.length >= this.freeTiles) {
+        this._gameOver();
+        return;
+      }
       if (this.options.enableBonusFood && !this.options.enableTimedBonusFood && this.foodsEaten % 5 === 0 && !this.bonusFood) {
         this._placeBonusFood();
       }

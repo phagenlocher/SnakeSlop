@@ -19,7 +19,7 @@ All modes are selected via a `<select>` dropdown in `index.html` and passed as t
 The standard Snake experience.
 
 - **Timer**: Counts up from `0:00` in the HUD as `Time: M:SS`.
-- **Game over**: Triggered by collision (wall, boundary, or self). No time limit.
+- **Game over**: Triggered by collision (wall, boundary, or self) or when the snake completely fills the playable area. No time limit.
 - **Final score**: Displayed on the canvas overlay ("GAME OVER" + "Score: X") and in the message text below.
 
 ### `timeTrial`
@@ -27,7 +27,7 @@ The standard Snake experience.
 Race against the clock.
 
 - **Timer**: Counts down from `2:00` in the HUD as `Time: M:SS`.
-- **Game over**: Triggered when the timer reaches `0:00` OR by collision (same as Classic).
+- **Game over**: Triggered when the timer reaches `0:00` OR by collision (same as Classic) OR when the snake completely fills the playable area.
 - **Final score**: Displayed on the canvas overlay ("GAME OVER" + "Score: X") and in the message text below.
 - **All Classic rules apply**: Grace period, speed boost, bonus food, walls, wrap, etc. all function identically.
 
@@ -160,6 +160,7 @@ Enables static walls arranged as a hollow square ring with openings in the cente
 - **Input**: `nextDirection` buffers input; committed to `direction` on each tick to prevent double-input bugs
 - **Warning state**: 1-second grace period before game over when about to collide; player can dodge with a safe arrow key (grace period only active when `enableGracePeriod` is on)
 - **Snake data**: array of `{x, y}` — `unshift` head, `pop` tail (skip pop when eating food); eating regular food sets `growth = 2`, causing the snake to grow by 2 segments over the next 2 ticks
+- **Board-full detection**: `freeTiles` is computed in `init()` as `COLS * ROWS` minus wall count. After each food eaten, `snake.length` is compared against `freeTiles`; if equal or greater, `_gameOver()` is called immediately (bypassing grace period).
 - **Food placement**: random grid position, retries if overlapping snake body
 - **Bonus food**: golden diamond, appears every 15 seconds, worth 100pts, moves randomly at `(currentSpeed + 60)`ms intervals, expires after 5s; eating it shrinks snake by half via `splice(Math.ceil(length / 2))`
 - **Pause/Resume**: canvas `focus`/`blur` events with a `focus-overlay` div; all timers cleared on pause, restored on resume with remaining time recalculated
