@@ -206,7 +206,7 @@ class SnakeGame {
     let pos;
     do {
       pos = { x: Math.floor(Math.random() * this.COLS), y: Math.floor(Math.random() * this.ROWS) };
-    } while (this.snake.some(s => s.x === pos.x && s.y === pos.y) || (this.food.x === pos.x && this.food.y === pos.y) || (this.options.enableWalls && WALLS.some(w => w.x === pos.x && w.y === pos.y)));
+    } while (this.snake.some(s => s.x === pos.x && s.y === pos.y) || (this.food && this.food.x === pos.x && this.food.y === pos.y) || (this.options.enableWalls && WALLS.some(w => w.x === pos.x && w.y === pos.y)));
     this.bonusFood = pos;
     this.bonusFoodInterval = setInterval(() => this._moveBonusFood(), this.currentSpeed + 60);
     this.bonusFoodTimeout = setTimeout(() => {
