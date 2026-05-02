@@ -255,6 +255,22 @@ class SnakeGame {
     return foodSize < largestOther;
   }
 
+  _hasAnySafeMove() {
+    const dirs = [{ x: 0, y: -1 }, { x: 0, y: 1 }, { x: -1, y: 0 }, { x: 1, y: 0 }];
+    for (const dir of dirs) {
+      const nextHead = { x: this.snake[0].x + dir.x, y: this.snake[0].y + dir.y };
+      if (this.options.enableWrap) {
+        nextHead.x = (nextHead.x + this.COLS) % this.COLS;
+        nextHead.y = (nextHead.y + this.ROWS) % this.ROWS;
+      }
+      const hitsWall = this.options.enableWalls && WALLS.some(w => w.x === nextHead.x && w.y === nextHead.y);
+      const hitsBoundary = nextHead.x < 0 || nextHead.x >= this.COLS || nextHead.y < 0 || nextHead.y >= this.ROWS;
+      const hitsSelf = this.snake.some(s => s.x === nextHead.x && s.y === nextHead.y);
+      if (!hitsWall && !hitsBoundary && !hitsSelf) return true;
+    }
+    return false;
+  }
+
   _eatRegularFood() {
     if (this.options.enableScoreBonus && this.scoreBonus > 0) {
       this.score += this.scoreBonus;
@@ -328,12 +344,16 @@ class SnakeGame {
       });
     }
 
-    this.ctx.fillStyle = this.state === 'warning' ? '#ff6666' : '#4a7a4a';
+    this.ctx.fillStyle = this.state === 'warning' ? '#ff6666' : this.state === 'ignored' ? '#c084fc' : '#4a7a4a';
     this.snake.forEach((seg) => {
       this.ctx.fillRect(seg.x * this.GRID + 1, seg.y * this.GRID + 1, this.GRID - 2, this.GRID - 2);
     });
 
-    if (!this.speedBoostActive) {
+    if (this.state === 'ignored') {
+      this.ctx.fillStyle = '#e2ccff';
+      const head = this.snake[0];
+      this.ctx.fillRect(head.x * this.GRID + 1, head.y * this.GRID + 1, this.GRID - 2, this.GRID - 2);
+    } else if (!this.speedBoostActive) {
       this.ctx.fillStyle = this.state === 'warning' ? '#ffaaaa' : '#8ad88a';
       const head = this.snake[0];
       this.ctx.fillRect(head.x * this.GRID + 1, head.y * this.GRID + 1, this.GRID - 2, this.GRID - 2);
@@ -410,6 +430,14 @@ class SnakeGame {
     const hitsSelf = this.snake.some(s => s.x === nextHead.x && s.y === nextHead.y);
 
     if (hitsWall || hitsBoundary || hitsSelf) {
+      if (this.options.mode === 'constrictor' && hitsSelf) {
+        if (this._hasAnySafeMove()) {
+          this._enterIgnored();
+        } else {
+          this._gameOver();
+        }
+        return;
+      }
       if (this.options.enableGracePeriod) {
         this._enterWarning();
       } else {
@@ -473,6 +501,16 @@ class SnakeGame {
     this.warningTimeout = setTimeout(() => this._gameOver(), this.speedBoostActive ? 700 / 1.35 : 700);
   }
 
+  _enterIgnored() {
+    clearInterval(this.gameLoop);
+    clearInterval(this.bonusFoodInterval);
+    this._deactivateSpeedBoost();
+    this.state = 'ignored';
+    this.inputBuffer = [];
+    this.messageEl.textContent = 'Snake stuck — press a safe direction';
+    this._draw();
+  }
+
   _startGame() {
     this.canvas.focus();
     this.state = 'playing';
@@ -499,7 +537,7 @@ class SnakeGame {
   }
 
   _pauseGame() {
-    if (this.state !== 'playing' && this.state !== 'warning') return;
+    if (this.state !== 'playing' && this.state !== 'warning' && this.state !== 'ignored') return;
     this.wasPaused = true;
     this._clearAllTimers();
     if (this.state === 'warning') {
@@ -540,6 +578,20 @@ class SnakeGame {
       }
       if (this.options.enableScoreBonus && this.scoreBonus > 0) {
         this._startBonusDecay();
+      }
+    } else if (this.state === 'ignored') {
+      if (this.options.enableBonusFood && this.bonusFood) {
+        this.bonusFoodInterval = setInterval(() => this._moveBonusFood(), this.currentSpeed + 60);
+        this.bonusFoodTimeout = setTimeout(() => {
+          clearInterval(this.bonusFoodInterval);
+          this.bonusFood = null;
+        }, 5000);
+      }
+      if (this.options.enableScoreBonus && this.scoreBonus > 0) {
+        this._startBonusDecay();
+      }
+      if (this.options.enableTimedBonusFood) {
+        this._startBonusFoodTimer();
       }
     }
     this.overlay.textContent = 'Click to focus';
@@ -598,6 +650,30 @@ class SnakeGame {
       this.state = 'playing';
       this.messageEl.textContent = '';
       this.speedBoostActive = false;
+      this.gameLoop = setInterval(() => this._update(), this.currentSpeed);
+      if (this.options.enableBonusFood && this.bonusFood) {
+        this.bonusFoodInterval = setInterval(() => this._moveBonusFood(), this.currentSpeed + 60);
+      }
+      return;
+    }
+
+    if (this.state === 'ignored') {
+      const newHead = { x: this.snake[0].x + newDir.x, y: this.snake[0].y + newDir.y };
+      if (this.options.enableWrap) {
+        newHead.x = (newHead.x + this.COLS) % this.COLS;
+        newHead.y = (newHead.y + this.ROWS) % this.ROWS;
+      }
+      const hitsWall = this.options.enableWalls && WALLS.some(w => w.x === newHead.x && w.y === newHead.y);
+      const hitsBoundary = newHead.x < 0 || newHead.x >= this.COLS || newHead.y < 0 || newHead.y >= this.ROWS;
+      const hitsSelf = this.snake.some(s => s.x === newHead.x && s.y === newHead.y);
+      if (hitsWall || hitsBoundary || hitsSelf) {
+        return;
+      }
+      this.inputBuffer = [];
+      this.direction = newDir;
+      this.nextDirection = newDir;
+      this.state = 'playing';
+      this.messageEl.textContent = '';
       this.gameLoop = setInterval(() => this._update(), this.currentSpeed);
       if (this.options.enableBonusFood && this.bonusFood) {
         this.bonusFoodInterval = setInterval(() => this._moveBonusFood(), this.currentSpeed + 60);

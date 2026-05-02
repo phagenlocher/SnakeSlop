@@ -10,7 +10,7 @@ Open `index.html` in any browser to play.
 |---|---|
 | Classic | Standard Snake. Timer counts up, no time limit. Game over on collision or when the board is completely filled. |
 | Time Trial | Race against the clock. Timer counts down from 2:00. Game over when time runs out, on collision, or when the board is completely filled. All Classic rules apply. |
-| Constrictor | Food is eaten by enclosure, not head collision. Snake auto-grows to length 15 at start and never changes length. Head passing over food poofs it away (no score/growth). Bonus food also enclosure-only, but shrink is disabled. All Classic rules apply except `enableShrinkOnBonusFood`, which is ignored. |
+| Constrictor | Food is eaten by enclosure, not head collision. Snake auto-grows to length 15 at start and never changes length. Self-collision enters an `ignored` state (snake freezes, waits for a safe direction). Head passing over food poofs it away (no score/growth). Bonus food also enclosure-only, but shrink is disabled. All Classic rules apply except `enableShrinkOnBonusFood` (ignored) and self-collision uses `ignored` instead of game over. |
 
 ## Togglable Features
 

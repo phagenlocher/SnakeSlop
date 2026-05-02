@@ -36,15 +36,16 @@ Race against the clock.
 Food is eaten by enclosure, not head collision.
 
 - **Timer**: Counts up from `0:00` in the HUD as `Time: M:SS` (same as Classic).
-- **Game over**: Triggered by collision (wall, boundary, or self) or when the snake completely fills the playable area. No time limit.
+- **Game over**: Triggered by collision (wall or boundary, with grace period) or when the snake completely fills/has no safe moves in the playable area. Self-collision does NOT cause game over — see below. No time limit.
 - **Final score**: Displayed on the canvas overlay ("GAME OVER" + "Score: X") and in the message text below.
 - **Auto-growth**: Snake starts at length 1. On game start, `startGrowth = 14` auto-grows the snake to length 15 over the first ~14 ticks (no food required).
+- **Self-collision**: Running into your own body does not kill the snake. Instead, the game enters the `ignored` state — the snake freezes, turns magenta (`#c084fc` body, `#e2ccff` head), and waits indefinitely for the player to press a safe direction. If no safe direction exists (all adjacent cells are blocked by walls, boundaries, or the snake's own body), the game ends immediately via `_hasAnySafeMove()`.
 - **Head hits food** (regular): The food disappears (poofs) and is replaced at a random **non-enclosed** position. No score, no growth. Guarded by `snake.length < freeTiles` to prevent board-full infinite loops.
 - **Head hits bonus food**: No effect — bonus food is enclosure-only.
 - **Enclosure eating** (regular food): Flood-fill BFS from the food through non-snake, non-wall cells. In non-wrap mode, if the flood fill cannot reach the grid boundary, the food is enclosed. In wrap mode, the flood fill wraps (modulo), and all connected components of free cells are compared — the food is enclosed if its component is smaller than the largest component (the "outside" region). Eating by enclosure awards 10 pts + bonus score, speed up, and `foodsEaten++`. The snake never grows from eating food — length stays constant at 15 after auto-growth.
 - **Enclosure eating** (bonus food): Same flood-fill check. Awards 100 pts, clears bonus timers. Shrink is disabled in constrictor mode. Also checked in `_moveBonusFood()` after each random step.
 - **Food placement**: `_placeFood()` rejects positions that are already enclosed (max 100 retries), ensuring food always spawns in the outside region.
-- **All Classic rules apply**: Grace period, speed boost, bonus food, walls, wrap, etc. all function identically, except `enableShrinkOnBonusFood` which is ignored. Bonus food moves, expires, and follows the same timing rules — only the eating mechanic (enclosure vs head) differs.
+- **All Classic rules apply**: Grace period, speed boost, bonus food, walls, wrap, etc. all function identically, except `enableShrinkOnBonusFood` which is ignored and self-collision which enters the `ignored` state instead of warning/game over (grace period toggle has no effect on self-collision). Bonus food moves, expires, and follows the same timing rules — only the eating mechanic (enclosure vs head) differs.
 
 ## Togglable Features
 
@@ -75,6 +76,7 @@ Enables a 1-second warning/grace period before game over when the snake is about
   - If the player presses an unsafe direction during warning, it is ignored.
   - If no safe key is pressed within 1 second, `_gameOver()` is called.
 - **When disabled**: Collision causes immediate game over with no warning window.
+- **Constrictor interaction**: Self-collision in constrictor mode always enters the `ignored` state regardless of the grace period setting. Walls and boundaries still respect the grace period.
 
 ### `enableShrinkOnBonusFood` (default: `true`)
 
@@ -170,7 +172,7 @@ Enables static walls arranged as a hollow square ring with openings in the cente
 - **Options**: `mode` (`'classic'`, `'timeTrial'`, or `'constrictor'`), `enableBonusFood`, `enableGracePeriod`, `enableShrinkOnBonusFood`, `enableSpeedUp`, `enableScoreBonus`, `enableWrap`, `enableSpeedBoost`, `enableInputBuffer`, `enableTimedBonusFood`, `enableWalls` — toggled via UI; game remounts on change
 - **Canvas**: 400×400px, grid size `GRID=20`, columns/rows computed from canvas dimensions
 - **HUD**: Score display + bonus score + timer (`Time: M:SS`)
-- **State machine**: `waiting` → `playing` → `warning` → `over` (space restarts to `waiting`); pause/resume via canvas focus/blur
+- **State machine**: `waiting` → `playing` → `warning`/`ignored` → `over` (space restarts to `waiting`); pause/resume via canvas focus/blur
 - **Game loop**: `setInterval(() => this._update(), currentSpeed)` — speed increases per food eaten: `BASE_SPEED=135` → `MIN_SPEED=50`, step `SPEED_STEP=2.4`
 - **Input**: `nextDirection` buffers input; committed to `direction` on each tick to prevent double-input bugs
 - **Warning state**: 1-second grace period before game over when about to collide; player can dodge with a safe arrow key (grace period only active when `enableGracePeriod` is on)
