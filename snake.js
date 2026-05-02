@@ -168,17 +168,37 @@ class SnakeGame {
   }
 
   _placeFood() {
+    const isConstrictor = this.options.mode === MODE_CONSTRICTOR;
     let pos;
     let tries = 0;
+    const maxTries = 200;
     do {
       pos = { x: Math.floor(Math.random() * this.COLS), y: Math.floor(Math.random() * this.ROWS) };
       tries++;
     } while (
       this.snake.some(s => s.x === pos.x && s.y === pos.y) ||
       (this.options.enableWalls && WALLS.some(w => w.x === pos.x && w.y === pos.y)) ||
-      (this.options.mode === MODE_CONSTRICTOR && tries < FOOD_PLACE_MAX_RETRIES && this._isFoodEnclosed(pos))
+      (isConstrictor && tries < maxTries && this._isFoodEnclosed(pos))
     );
+    if (isConstrictor && this._isFoodEnclosed(pos)) {
+      const fallback = this._findAnyFreeTile();
+      if (fallback) pos = fallback;
+    }
     this.food = pos;
+  }
+
+  _findAnyFreeTile() {
+    for (let y = 0; y < this.ROWS; y++) {
+      for (let x = 0; x < this.COLS; x++) {
+        if (
+          !this.snake.some(s => s.x === x && s.y === y) &&
+          !(this.options.enableWalls && WALLS.some(w => w.x === x && w.y === y))
+        ) {
+          return { x, y };
+        }
+      }
+    }
+    return null;
   }
 
   _placeBonusFood() {
@@ -485,9 +505,11 @@ class SnakeGame {
 
     if (this.options.mode === MODE_CONSTRICTOR) {
       if (head.x === this.food.x && head.y === this.food.y) {
-        if (this.snake.length < this.freeTiles) {
-          this._placeFood();
+        if (this.snake.length >= this.freeTiles) {
+          this._gameOver();
+          return;
         }
+        this._placeFood();
       }
 
       if (this.startGrowth > 0) {
@@ -682,6 +704,11 @@ class SnakeGame {
       this.gameLoop = setInterval(() => this._update(), this.currentSpeed);
       if (this.options.enableBonusFood && this.bonusFood) {
         this.bonusFoodInterval = setInterval(() => this._moveBonusFood(), this.currentSpeed + 60);
+        clearTimeout(this.bonusFoodTimeout);
+        this.bonusFoodTimeout = setTimeout(() => {
+          clearInterval(this.bonusFoodInterval);
+          this.bonusFood = null;
+        }, BONUS_FOOD_LIFETIME_MS);
       }
       return;
     }
@@ -706,6 +733,11 @@ class SnakeGame {
       this.gameLoop = setInterval(() => this._update(), this.currentSpeed);
       if (this.options.enableBonusFood && this.bonusFood) {
         this.bonusFoodInterval = setInterval(() => this._moveBonusFood(), this.currentSpeed + 60);
+        clearTimeout(this.bonusFoodTimeout);
+        this.bonusFoodTimeout = setTimeout(() => {
+          clearInterval(this.bonusFoodInterval);
+          this.bonusFood = null;
+        }, BONUS_FOOD_LIFETIME_MS);
       }
       return;
     }
