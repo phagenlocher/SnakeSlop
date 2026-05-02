@@ -22,6 +22,7 @@ class SnakeGame {
   constructor(container, options = {}) {
     this.container = container;
     this.options = {
+      mode: options.mode || 'classic',
       enableBonusFood: options.enableBonusFood !== undefined ? options.enableBonusFood : true,
       enableGracePeriod: options.enableGracePeriod !== undefined ? options.enableGracePeriod : true,
       enableShrinkOnBonusFood: options.enableShrinkOnBonusFood !== undefined ? options.enableShrinkOnBonusFood : true,
@@ -38,6 +39,7 @@ class SnakeGame {
     this.BASE_SPEED = 135;
     this.MIN_SPEED = 50;
     this.SPEED_STEP = 2.4;
+    this.TIME_LIMIT = 120000;
 
     this._buildDOM();
     this._bindEvents();
@@ -122,7 +124,7 @@ class SnakeGame {
     this.growth = 0;
     this._clearAllTimers();
     this.scoreEl.textContent = 'Score: 0';
-    this.timerEl.textContent = 'Time: 0:00';
+    this.timerEl.textContent = this.options.mode === 'timeTrial' ? 'Time: 2:00' : 'Time: 0:00';
     this.bonusEl.textContent = 'Bonus: 100';
     this.messageEl.textContent = 'Press any arrow key to start';
     this.overlay.textContent = 'Click to focus';
@@ -185,6 +187,21 @@ class SnakeGame {
     }, 200);
   }
 
+  _updateTimerDisplay() {
+    this.elapsed = Date.now() - this.startTime;
+    if (this.options.mode === 'timeTrial') {
+      const remaining = Math.max(0, this.TIME_LIMIT - this.elapsed);
+      const secs = Math.floor(remaining / 1000);
+      this.timerEl.textContent = 'Time: ' + Math.floor(secs / 60) + ':' + String(secs % 60).padStart(2, '0');
+      if (remaining <= 0) {
+        this._gameOver();
+      }
+    } else {
+      const secs = Math.floor(this.elapsed / 1000);
+      this.timerEl.textContent = 'Time: ' + Math.floor(secs / 60) + ':' + String(secs % 60).padStart(2, '0');
+    }
+  }
+
   _draw() {
     this.ctx.fillStyle = '#0d1a0d';
     this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
@@ -234,6 +251,18 @@ class SnakeGame {
       this.ctx.lineTo(cx - r, cy);
       this.ctx.closePath();
       this.ctx.fill();
+    }
+
+    if (this.state === 'over') {
+      this.ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+      this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+      this.ctx.fillStyle = '#fff';
+      this.ctx.font = 'bold 32px Courier New';
+      this.ctx.textAlign = 'center';
+      this.ctx.textBaseline = 'middle';
+      this.ctx.fillText('GAME OVER', this.canvas.width / 2, this.canvas.height / 2 - 20);
+      this.ctx.font = '24px Courier New';
+      this.ctx.fillText('Score: ' + this.score, this.canvas.width / 2, this.canvas.height / 2 + 20);
     }
   }
 
@@ -347,11 +376,7 @@ class SnakeGame {
     this.startTime = Date.now() - this.elapsed;
     this.messageEl.textContent = '';
     this.gameLoop = setInterval(() => this._update(), this.currentSpeed);
-    this.timerInterval = setInterval(() => {
-      this.elapsed = Date.now() - this.startTime;
-      const secs = Math.floor(this.elapsed / 1000);
-      this.timerEl.textContent = 'Time: ' + Math.floor(secs / 60) + ':' + String(secs % 60).padStart(2, '0');
-    }, 1000);
+    this.timerInterval = setInterval(() => this._updateTimerDisplay(), 1000);
     if (this.options.enableScoreBonus && this.scoreBonus > 0) {
       this._startBonusDecay();
     }
@@ -364,6 +389,7 @@ class SnakeGame {
     this._clearAllTimers();
     this.state = 'over';
     this.messageEl.textContent = 'Game Over! Press Space to restart';
+    this._draw();
   }
 
   _pauseGame() {
@@ -382,11 +408,7 @@ class SnakeGame {
     if (this.state === 'playing') {
       this.startTime = Date.now() - this.elapsed;
       this.gameLoop = setInterval(() => this._update(), this.speedBoostActive ? this.currentSpeed / 1.35 : this.currentSpeed);
-      this.timerInterval = setInterval(() => {
-        this.elapsed = Date.now() - this.startTime;
-        const secs = Math.floor(this.elapsed / 1000);
-        this.timerEl.textContent = 'Time: ' + Math.floor(secs / 60) + ':' + String(secs % 60).padStart(2, '0');
-      }, 1000);
+      this.timerInterval = setInterval(() => this._updateTimerDisplay(), 1000);
       if (this.options.enableBonusFood && this.bonusFood) {
         this.bonusFoodInterval = setInterval(() => this._moveBonusFood(), this.currentSpeed + 60);
         this.bonusFoodTimeout = setTimeout(() => {

@@ -10,6 +10,27 @@ Open `index.html` directly in a browser.
 
 No tooling is configured. This is a zero-dependency static page.
 
+## Game Modes
+
+All modes are selected via a `<select>` dropdown in `index.html` and passed as the `mode` option to `SnakeGame(container, options)`. The game is destroyed and remounted whenever the mode changes. All feature toggles apply identically regardless of mode.
+
+### `classic` (default)
+
+The standard Snake experience.
+
+- **Timer**: Counts up from `0:00` in the HUD as `Time: M:SS`.
+- **Game over**: Triggered by collision (wall, boundary, or self). No time limit.
+- **Final score**: Displayed on the canvas overlay ("GAME OVER" + "Score: X") and in the message text below.
+
+### `timeTrial`
+
+Race against the clock.
+
+- **Timer**: Counts down from `2:00` in the HUD as `Time: M:SS`.
+- **Game over**: Triggered when the timer reaches `0:00` OR by collision (same as Classic).
+- **Final score**: Displayed on the canvas overlay ("GAME OVER" + "Score: X") and in the message text below.
+- **All Classic rules apply**: Grace period, speed boost, bonus food, walls, wrap, etc. all function identically.
+
 ## Togglable Features
 
 All features are controlled via checkboxes in `index.html` and passed as options to `SnakeGame(container, options)`. The game is destroyed and remounted whenever any toggle changes.
@@ -127,13 +148,13 @@ Enables static walls arranged as a hollow square ring with openings in the cente
 ## Architecture
 
 - **Files**:
-  - `index.html` — markup, feature toggles, and game mounting logic
-  - `snake.js` — `SnakeGame` class (~431 lines)
-  - `snake.css` — styles (~72 lines)
+  - `index.html` — markup, mode selector, feature toggles, and game mounting logic
+  - `snake.js` — `SnakeGame` class (~450 lines)
+  - `snake.css` — styles (~96 lines)
 - **Class-based**: `SnakeGame` class with `constructor(container, options)`, `init()`, `destroy()`, `_buildDOM()`, `_bindEvents()`
-- **Options**: `enableBonusFood`, `enableGracePeriod`, `enableShrinkOnBonusFood`, `enableSpeedUp`, `enableScoreBonus`, `enableWrap`, `enableSpeedBoost`, `enableInputBuffer`, `enableTimedBonusFood`, `enableWalls` — toggled via checkboxes in the UI; game remounts on change
+- **Options**: `mode` (`'classic'` or `'timeTrial'`), `enableBonusFood`, `enableGracePeriod`, `enableShrinkOnBonusFood`, `enableSpeedUp`, `enableScoreBonus`, `enableWrap`, `enableSpeedBoost`, `enableInputBuffer`, `enableTimedBonusFood`, `enableWalls` — toggled via UI; game remounts on change
 - **Canvas**: 400×400px, grid size `GRID=20`, columns/rows computed from canvas dimensions
-- **HUD**: Score display + elapsed timer (`Time: M:SS`)
+- **HUD**: Score display + bonus score + timer (`Time: M:SS`)
 - **State machine**: `waiting` → `playing` → `warning` → `over` (space restarts to `waiting`); pause/resume via canvas focus/blur
 - **Game loop**: `setInterval(() => this._update(), currentSpeed)` — speed increases per food eaten: `BASE_SPEED=135` → `MIN_SPEED=50`, step `SPEED_STEP=2.4`
 - **Input**: `nextDirection` buffers input; committed to `direction` on each tick to prevent double-input bugs
@@ -143,3 +164,5 @@ Enables static walls arranged as a hollow square ring with openings in the cente
 - **Bonus food**: golden diamond, appears every 15 seconds, worth 100pts, moves randomly at `(currentSpeed + 60)`ms intervals, expires after 5s; eating it shrinks snake by half via `splice(Math.ceil(length / 2))`
 - **Pause/Resume**: canvas `focus`/`blur` events with a `focus-overlay` div; all timers cleared on pause, restored on resume with remaining time recalculated
 - **Reversal guard**: player cannot reverse direction in a single tick
+- **Game over overlay**: Semi-transparent dark overlay with "GAME OVER" and "Score: X" drawn on canvas when `state === 'over'`
+- **Timer display**: `_updateTimerDisplay()` handles both Classic (count-up) and Time Trial (count-down from 2 minutes) modes

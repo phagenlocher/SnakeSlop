@@ -18,6 +18,13 @@ You should have received a copy of the CC0 Public Domain Dedication along with t
 <body>
 <div id="root">
   <div id="game-container"></div>
+  <div id="mode-selector">
+    <label for="mode-select">Mode:</label>
+    <select id="mode-select">
+      <option value="classic">Classic</option>
+      <option value="timeTrial">Time Trial</option>
+    </select>
+  </div>
 <hr>
 <details id="features-details">
   <summary>Game Features</summary>
@@ -39,6 +46,7 @@ You should have received a copy of the CC0 Public Domain Dedication along with t
 <script src="snake.js"></script>
 <script>
 const gameContainer = document.getElementById('game-container');
+const modeSelect = document.getElementById('mode-select');
 const toggleBonusFood = document.getElementById('toggle-bonus-food');
 const toggleGracePeriod = document.getElementById('toggle-grace-period');
 const toggleShrink = document.getElementById('toggle-shrink');
@@ -57,6 +65,7 @@ function mountGame() {
     game.destroy();
   }
   game = new SnakeGame(gameContainer, {
+    mode: modeSelect.value,
     enableBonusFood: toggleBonusFood.checked,
     enableGracePeriod: toggleGracePeriod.checked,
     enableShrinkOnBonusFood: toggleShrink.checked,
@@ -70,6 +79,7 @@ function mountGame() {
   });
 }
 
+modeSelect.addEventListener('change', mountGame);
 toggleBonusFood.addEventListener('change', mountGame);
 toggleGracePeriod.addEventListener('change', mountGame);
 toggleShrink.addEventListener('change', mountGame);

@@ -4,6 +4,13 @@ A vanilla HTML/CSS/JS Snake game designed as a **teaching tool for game design**
 
 Open `index.html` in any browser to play. 
 
+## Game Modes
+
+| Mode | Description |
+|---|---|
+| Classic | Standard Snake. Timer counts up, no time limit. Game over on collision. |
+| Time Trial | Race against the clock. Timer counts down from 2:00. Game over when time runs out OR on collision. All Classic rules apply. |
+
 ## Togglable Features
 
 Checkboxes in the UI control which mechanics are active. The game is destroyed and remounted whenever a toggle changes.
@@ -20,8 +27,6 @@ Checkboxes in the UI control which mechanics are active. The game is destroyed a
 | Input Buffer | On | Queues up to 2 rapid directional inputs so they aren't lost between ticks. |
 | Timed Bonus Food | On | Bonus food spawns every 15 seconds instead of every 5 foods eaten. |
 | Static Walls | On | A hollow square ring of walls with openings in the center of each side. Always solid, even with wrap around. |
-
-Disabling all of them leaves a classic Snake: eat food, grow, don't die.
 
 ## License
 
