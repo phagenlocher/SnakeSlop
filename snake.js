@@ -51,7 +51,7 @@ class SnakeGame {
       <div class="snake-container">
         <div class="snake-hud">
           <span class="snake-score">Score: 0</span>
-          <span class="snake-bonus">Bonus: 0</span>
+          ${this.options.enableScoreBonus ? '<span class="snake-bonus">Bonus: 0</span>' : ''}
           <span class="snake-timer">Time: 0:00</span>
         </div>
         <div class="snake-game-wrapper"><canvas class="snake-canvas" width="400" height="400" tabindex="0"></canvas><div class="snake-focus-overlay">Click to focus</div></div>
@@ -129,7 +129,7 @@ class SnakeGame {
     }
     this.scoreEl.textContent = 'Score: 0';
     this.timerEl.textContent = this.options.mode === 'timeTrial' ? 'Time: 2:00' : 'Time: 0:00';
-    this.bonusEl.textContent = 'Bonus: 100';
+    if (this.bonusEl) this.bonusEl.textContent = 'Bonus: 100';
     this.messageEl.textContent = 'Press any arrow key to start';
     this.overlay.textContent = 'Click to focus';
     this._placeFood();
@@ -324,7 +324,7 @@ class SnakeGame {
       }
       if (this.options.enableScoreBonus) {
     this.scoreBonus = 100;
-        this.bonusEl.textContent = 'Bonus: ' + this.scoreBonus;
+      if (this.bonusEl) this.bonusEl.textContent = 'Bonus: ' + this.scoreBonus;
         this._startBonusDecay();
       }
       this.score += 10;
