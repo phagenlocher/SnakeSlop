@@ -112,7 +112,7 @@ class SnakeGame {
     this.ROWS = 20;
     this.BASE_SPEED = 135;
     this.MIN_SPEED = 50;
-    this.SPEED_STEP = 2.4;
+    this.SPEED_STEP = 1.68;
     this.TIME_LIMIT = 120000;
 
     this._buildDOM();
