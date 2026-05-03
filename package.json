@@ -13,13 +13,13 @@
     "url": "git+https://github.com/phagenlocher/Snake-Demo.git"
   },
   "keywords": [],
-  "author": "",
+  "author": "Philipp Hagenlocher",
   "license": "CC0-1.0",
   "type": "commonjs",
   "bugs": {
     "url": "https://github.com/phagenlocher/Snake-Demo/issues"
   },
-  "homepage": "https://github.com/phagenlocher/Snake-Demo#readme",
+  "homepage": "https://github.com/phagenlocher/Snake-Demo",
   "devDependencies": {
     "@eslint/js": "^10.0.1",
     "eslint": "^10.3.0",
