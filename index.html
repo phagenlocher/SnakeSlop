@@ -86,6 +86,10 @@ You should have received a copy of the CC0 Public Domain Dedication along with t
               <label title="Static walls form a hollow square with openings in the center of each side"
                 ><input type="checkbox" class="snake-toggle-walls" checked /> Static Walls</label
               >
+              <label
+                title="Black/white wormhole pair spawns every 30s and lasts 15s. Enter the black cell to teleport to the white cell. Won't spawn when board is nearly full."
+                ><input type="checkbox" class="snake-toggle-wormholes" checked /> Worm Holes</label
+              >
             </div>
           </div>
         </div>
@@ -109,6 +113,7 @@ You should have received a copy of the CC0 Public Domain Dedication along with t
       const toggleTimedBonus = document.querySelector('.snake-toggle-timed-bonus');
       const toggleWalls = document.querySelector('.snake-toggle-walls');
       const toggleInstantMovement = document.querySelector('.snake-toggle-instant-movement');
+      const toggleWormholes = document.querySelector('.snake-toggle-wormholes');
 
       let game = null;
 
@@ -126,6 +131,7 @@ You should have received a copy of the CC0 Public Domain Dedication along with t
           enableInstantMovement: toggleInstantMovement.checked,
           enableTimedBonusFood: toggleTimedBonus.checked,
           enableWalls: toggleWalls.checked,
+          enableWormholes: toggleWormholes.checked,
         };
         localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
       }
@@ -147,6 +153,7 @@ You should have received a copy of the CC0 Public Domain Dedication along with t
           if (typeof s.enableInstantMovement === 'boolean') toggleInstantMovement.checked = s.enableInstantMovement;
           if (typeof s.enableTimedBonusFood === 'boolean') toggleTimedBonus.checked = s.enableTimedBonusFood;
           if (typeof s.enableWalls === 'boolean') toggleWalls.checked = s.enableWalls;
+          if (typeof s.enableWormholes === 'boolean') toggleWormholes.checked = s.enableWormholes;
         } catch (_) {
           // corrupted or missing → use HTML defaults
         }
@@ -169,6 +176,7 @@ You should have received a copy of the CC0 Public Domain Dedication along with t
           enableInstantMovement: toggleInstantMovement.checked,
           enableTimedBonusFood: toggleTimedBonus.checked,
           enableWalls: toggleWalls.checked,
+          enableWormholes: toggleWormholes.checked,
         });
         saveSettings();
       }
@@ -185,6 +193,7 @@ You should have received a copy of the CC0 Public Domain Dedication along with t
       toggleInstantMovement.addEventListener('change', mountGame);
       toggleTimedBonus.addEventListener('change', mountGame);
       toggleWalls.addEventListener('change', mountGame);
+      toggleWormholes.addEventListener('change', mountGame);
 
       loadSettings();
       mountGame();

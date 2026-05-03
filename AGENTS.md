@@ -163,6 +163,20 @@ Replaces the food-count-based bonus food spawn with a time-based trigger.
 - **Pause/resume**: Timer is cleared on pause (via `_clearAllTimers()`) and restarted fresh on resume via `_startBonusFoodTimer()`.
 - **When disabled**: Bonus food spawns via the original food-count mechanic (every 5 regular foods eaten).
 
+### `enableWormholes` (default: `true`)
+
+Enables a teleport mechanic with a wormhole entry/exit pair.
+
+- **Spawn trigger**: Every 30 seconds, if no wormhole pair exists, a black entry cell and white exit cell appear at random valid positions at least 5 cells apart (Manhattan distance). Does NOT spawn if 10 or fewer free tiles remain on the board.
+- **Lifetime**: Wormholes auto-despawn after 15 seconds via `setTimeout`, or immediately when the snake enters the black cell.
+- **Placement**: Entry and exit avoid snake body, regular food, bonus food, and wall cells.
+- **Teleport**: When the snake's head enters the black cell, it instantly appears at the white cell, continuing in the same direction. Both wormholes are consumed and the lifetime timeout is cancelled.
+- **White cell**: Light square with no mechanical effect — the snake moves through it freely.
+- **Collision**: If the teleport destination (white cell) is blocked by the snake's body, normal collision rules apply (grace period or game over).
+- **Appearance**: `#003a00` (dark green) for entry, `#e8e8e8` (off-white) for exit. Drawn after walls, before snake.
+- **Constrictor**: Wormhole cells do not block flood-fill enclosure checks. Teleport fires before constrictor-specific head-food logic.
+- **When disabled**: No wormholes ever spawn; rendering, timers, and teleport checks are all skipped.
+
 ### `enableWalls` (default: `true`)
 
 Enables static walls arranged as a hollow square ring with openings in the center of each side.
@@ -182,7 +196,7 @@ Enables static walls arranged as a hollow square ring with openings in the cente
   - `snake.js` — `SnakeGame` class
   - `snake.css` — styles
 - **Class-based**: `SnakeGame` class with `constructor(container, options)`, `init()`, `destroy()`, `_buildDOM()`, `_bindEvents()`
-- **Options**: `mode` (`'classic'`, `'timeTrial'`, or `'constrictor'`), `enableBonusFood`, `enableGracePeriod`, `enableShrinkOnBonusFood`, `enableSpeedUp`, `enableScoreBonus`, `enableWrap`, `enableSpeedBoost`, `enableInputBuffer`, `enableInstantMovement`, `enableTimedBonusFood`, `enableWalls` — toggled via UI; game remounts on change
+- **Options**: `mode` (`'classic'`, `'timeTrial'`, or `'constrictor'`), `enableBonusFood`, `enableGracePeriod`, `enableShrinkOnBonusFood`, `enableSpeedUp`, `enableScoreBonus`, `enableWrap`, `enableSpeedBoost`, `enableInputBuffer`, `enableInstantMovement`, `enableTimedBonusFood`, `enableWalls`, `enableWormholes` — toggled via UI; game remounts on change
 - **Canvas**: 400×400px, grid size `GRID=20`, columns/rows computed from canvas dimensions
 - **HUD**: Score display + bonus score + timer (`Time: M:SS`)
 - **State machine**: `waiting` → `playing` → `warning`/`ignored` → `over` (space restarts to `waiting`); pause/resume via canvas focus/blur

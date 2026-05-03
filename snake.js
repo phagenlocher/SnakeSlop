@@ -73,6 +73,12 @@ const COLOR_SNAKE_HEAD_NORMAL = '#8ad88a';
 const COLOR_SNAKE_HEAD_BOOST = '#f0e68c';
 const COLOR_FOOD = '#7aff7a';
 const COLOR_FOOD_BONUS = '#FFD700';
+const COLOR_WORMHOLE_ENTRY = '#003a00';
+const COLOR_WORMHOLE_EXIT = '#e8e8e8';
+const WORMHOLE_SPAWN_INTERVAL_MS = 30000;
+const WORMHOLE_LIFETIME_MS = 15000;
+const WORMHOLE_MIN_DISTANCE = 5;
+const WORMHOLE_MIN_FREE_TILES = 10;
 const COLOR_OVERLAY = 'rgba(0, 0, 0, 0.7)';
 const COLOR_OVERLAY_TEXT = '#fff';
 
@@ -99,6 +105,7 @@ class SnakeGame {
       enableInstantMovement: options.enableInstantMovement !== undefined ? options.enableInstantMovement : true,
       enableTimedBonusFood: options.enableTimedBonusFood !== undefined ? options.enableTimedBonusFood : true,
       enableWalls: options.enableWalls !== undefined ? options.enableWalls : true,
+      enableWormholes: options.enableWormholes !== undefined ? options.enableWormholes : true,
     };
 
     this.COLS = 20;
@@ -170,6 +177,8 @@ class SnakeGame {
     clearTimeout(this.bonusFoodTimeout);
     clearInterval(this.bonusFoodTimer);
     clearInterval(this.scoreBonusInterval);
+    clearInterval(this.wormholeTimer);
+    clearTimeout(this.wormholeLifetime);
   }
 
   init() {
@@ -190,6 +199,8 @@ class SnakeGame {
     this.growth = 0;
     this.startGrowth = 0;
     this.warningElapsed = 0;
+    this.wormholeEntry = null;
+    this.wormholeExit = null;
     this._clearAllTimers();
     this.freeTiles = this.COLS * this.ROWS;
     if (this.options.enableWalls) {
@@ -242,6 +253,38 @@ class SnakeGame {
     return null;
   }
 
+  _placeWormholes() {
+    if (!this.options.enableWormholes) return;
+    if (this.freeTiles - this.snake.length <= WORMHOLE_MIN_FREE_TILES) return;
+    let entry, exit;
+    do {
+      entry = { x: Math.floor(Math.random() * this.COLS), y: Math.floor(Math.random() * this.ROWS) };
+    } while (
+      this.snake.some((s) => s.x === entry.x && s.y === entry.y) ||
+      (this.food && this.food.x === entry.x && this.food.y === entry.y) ||
+      (this.bonusFood && this.bonusFood.x === entry.x && this.bonusFood.y === entry.y) ||
+      (this.options.enableWalls && WALLS.some((w) => w.x === entry.x && w.y === entry.y))
+    );
+    do {
+      exit = { x: Math.floor(Math.random() * this.COLS), y: Math.floor(Math.random() * this.ROWS) };
+    } while (
+      (exit.x === entry.x && exit.y === entry.y) ||
+      this.snake.some((s) => s.x === exit.x && s.y === exit.y) ||
+      (this.food && this.food.x === exit.x && this.food.y === exit.y) ||
+      (this.bonusFood && this.bonusFood.x === exit.x && this.bonusFood.y === exit.y) ||
+      (this.options.enableWalls && WALLS.some((w) => w.x === exit.x && w.y === exit.y)) ||
+      Math.abs(exit.x - entry.x) + Math.abs(exit.y - entry.y) < WORMHOLE_MIN_DISTANCE
+    );
+    this.wormholeEntry = entry;
+    this.wormholeExit = exit;
+    clearTimeout(this.wormholeLifetime);
+    this.wormholeLifetime = setTimeout(() => {
+      this.wormholeEntry = null;
+      this.wormholeExit = null;
+      this._draw();
+    }, WORMHOLE_LIFETIME_MS);
+  }
+
   _placeBonusFood() {
     if (!this.options.enableBonusFood) {
       return;
@@ -272,6 +315,17 @@ class SnakeGame {
         this._placeBonusFood();
       }
     }, BONUS_FOOD_SPAWN_INTERVAL_MS);
+  }
+
+  _startWormholeTimer() {
+    if (!this.options.enableWormholes) return;
+    clearInterval(this.wormholeTimer);
+    this.wormholeTimer = setInterval(() => {
+      if (!this.wormholeEntry) {
+        this._placeWormholes();
+        this._draw();
+      }
+    }, WORMHOLE_SPAWN_INTERVAL_MS);
   }
 
   _moveBonusFood() {
@@ -505,6 +559,23 @@ class SnakeGame {
       });
     }
 
+    if (this.options.enableWormholes && this.wormholeEntry) {
+      this.ctx.fillStyle = COLOR_WORMHOLE_ENTRY;
+      this.ctx.fillRect(
+        this.wormholeEntry.x * this.CELL_SIZE + 1,
+        this.wormholeEntry.y * this.CELL_SIZE + 1,
+        this.CELL_SIZE - 2,
+        this.CELL_SIZE - 2
+      );
+      this.ctx.fillStyle = COLOR_WORMHOLE_EXIT;
+      this.ctx.fillRect(
+        this.wormholeExit.x * this.CELL_SIZE + 1,
+        this.wormholeExit.y * this.CELL_SIZE + 1,
+        this.CELL_SIZE - 2,
+        this.CELL_SIZE - 2
+      );
+    }
+
     this.ctx.fillStyle =
       this.state === 'warning'
         ? COLOR_SNAKE_WARNING
@@ -614,6 +685,23 @@ class SnakeGame {
     if (this.options.enableWrap) {
       nextHead.x = (nextHead.x + this.COLS) % this.COLS;
       nextHead.y = (nextHead.y + this.ROWS) % this.ROWS;
+    }
+
+    if (
+      this.options.enableWormholes &&
+      this.wormholeEntry &&
+      nextHead.x === this.wormholeEntry.x &&
+      nextHead.y === this.wormholeEntry.y
+    ) {
+      nextHead.x = this.wormholeExit.x;
+      nextHead.y = this.wormholeExit.y;
+      if (this.options.enableWrap) {
+        nextHead.x = (nextHead.x + this.COLS) % this.COLS;
+        nextHead.y = (nextHead.y + this.ROWS) % this.ROWS;
+      }
+      clearTimeout(this.wormholeLifetime);
+      this.wormholeEntry = null;
+      this.wormholeExit = null;
     }
 
     const hitsWall = this.options.enableWalls && WALLS.some((w) => w.x === nextHead.x && w.y === nextHead.y);
@@ -737,6 +825,9 @@ class SnakeGame {
     if (this.options.enableTimedBonusFood) {
       this._startBonusFoodTimer();
     }
+    if (this.options.enableWormholes) {
+      this._startWormholeTimer();
+    }
   }
 
   _gameOver() {
@@ -787,6 +878,9 @@ class SnakeGame {
       if (this.options.enableTimedBonusFood) {
         this._startBonusFoodTimer();
       }
+      if (this.options.enableWormholes) {
+        this._startWormholeTimer();
+      }
     } else if (this.state === 'warning') {
       const warningDuration = this.speedBoostActive ? WARNING_TIMEOUT_MS / SPEED_BOOST_FACTOR : WARNING_TIMEOUT_MS;
       this.warningTimeout = setTimeout(() => this._gameOver(), Math.max(0, warningDuration - this.warningElapsed));
@@ -795,6 +889,9 @@ class SnakeGame {
       this._resumeCommonTimers();
       if (this.options.enableTimedBonusFood) {
         this._startBonusFoodTimer();
+      }
+      if (this.options.enableWormholes) {
+        this._startWormholeTimer();
       }
     }
     this.overlay.textContent = 'Click to focus';
