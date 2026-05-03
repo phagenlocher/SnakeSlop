@@ -189,6 +189,107 @@ Enables static walls arranged as a hollow square ring with openings in the cente
 - **Warning escape**: Directions leading into a wall are rejected as unsafe during the grace period.
 - **When disabled**: No walls are rendered or checked; the arena is fully open (subject to `enableWrap` for boundary behavior).
 
+## Bitmap Rendering System
+
+Snake segments are rendered using pre-rendered off-screen canvas bitmaps instead of per-frame drawing calls.
+
+### Overview
+
+- **Concept**: At game init, 46 off-screen `<canvas>` elements (25×25px each) are created and stored in `this.bitmaps`. Each frame, the appropriate bitmap is drawn onto the main canvas via `drawImage()`.
+- **Performance**: Reduces per-frame drawing from dozens of `fillRect` calls to a single `drawImage` per segment.
+- **Location**: `snake.js:113-290` (palettes + `BITMAP_DRAWERS`), `snake.js:768-802` (bitmap creation), `snake.js:715-731` (draw-time lookup + `drawImage`).
+
+### Palettes (`snake.js:113-116`)
+
+Four color palettes define segment colors for different game states. Each palette has `body`, `head`, and `eye` properties:
+
+| Palette           | Key    | Body      | Head      | Eye       | State                      |
+| ----------------- | ------ | --------- | --------- | --------- | -------------------------- |
+| `PALETTE_NORMAL`  | `''`   | `#4a7a4a` | `#8ad88a` | `#0d1a0d` | Playing                    |
+| `PALETTE_WARNING` | `'_w'` | `#ff6666` | `#ffaaaa` | `#4a0000` | Grace period               |
+| `PALETTE_IGNORED` | `'_i'` | `#c084fc` | `#e2ccff` | `#4a0060` | Constrictor self-collision |
+| `PALETTE_BOOST`   | `'_b'` | `#4a7a4a` | `#f0e68c` | `#0d1a0d` | Speed boost (head only)    |
+
+### Segment Shapes (`BITMAP_DRAWERS`, `snake.js:119-244`)
+
+14 drawing functions, each receiving `(ctx, palette)` and drawing on a 25×25 canvas:
+
+| Key         | Lines   | Shape                                                      |
+| ----------- | ------- | ---------------------------------------------------------- |
+| `headUp`    | 120-128 | Head facing up, two eyes near top edge                     |
+| `headDown`  | 129-137 | Head facing down, two eyes near bottom edge                |
+| `headLeft`  | 138-146 | Head facing left, two eyes near left edge                  |
+| `headRight` | 147-155 | Head facing right, two eyes near right edge                |
+| `bodyHoriz` | 156-159 | Solid filled rectangle (horizontal segment)                |
+| `bodyVert`  | 160-163 | Solid filled rectangle (vertical segment)                  |
+| `tailUp`    | 164-173 | Tapered tail pointing up (4-step gradual taper: 7→5→3→1px) |
+| `tailDown`  | 174-183 | Tapered tail pointing down (4-step gradual taper)          |
+| `tailLeft`  | 184-193 | Tapered tail pointing left (4-step gradual taper)          |
+| `tailRight` | 194-203 | Tapered tail pointing right (4-step gradual taper)         |
+| `cornerLD`  | 204-208 | Left→down corner (clears top-right quadrant)               |
+| `cornerRD`  | 209-213 | Right→down corner (clears top-left quadrant)               |
+| `cornerLU`  | 214-218 | Left→up corner (clears bottom-right quadrant)              |
+| `cornerRU`  | 219-223 | Right→up corner (clears bottom-left quadrant)              |
+
+### Bitmap Creation (`_createBitmaps`, `snake.js:768-785`)
+
+Called during `init()`. Creates 46 bitmaps total:
+
+1. **3 full sets** (14 shapes × 3 palettes = 42): Normal (`''`), Warning (`'_w'`), Ignored (`'_i'`)
+2. **4 boost heads** (head shapes × boost palette = 4): `headUp_b`, `headDown_b`, `headLeft_b`, `headRight_b`
+
+Helper methods:
+
+- `_createBitmapSet(palette, suffix)` — creates 14 bitmaps for one palette, returns `{key: canvas}` object
+- `_makeBitmap(key, palette)` — creates a single 25×25 off-screen canvas, calls `BITMAP_DRAWERS[key](ctx, palette)`, returns the canvas
+
+### Bitmap Selection at Draw Time (`_draw`, `snake.js:715-731`)
+
+Each frame, for every snake segment:
+
+1. `_getSegmentBitmapKey(i)` determines the base shape key (e.g., `headUp`, `bodyHoriz`, `cornerLD`)
+2. State suffix is appended: `_b` (boost head), `_i` (ignored), `_w` (warning), or `''` (normal)
+3. `this.ctx.drawImage(this.bitmaps[key], x, y, CELL_SIZE, CELL_SIZE)` draws the pre-rendered bitmap
+
+### Segment Key Resolution (`_getSegmentBitmapKey`, `snake.js:804-835`)
+
+Determines which shape to use for segment index `i`:
+
+- **Head** (`i === 0`): Uses `this.direction` mapped through `DIR_KEY` → `headUp`/`headDown`/`headLeft`/`headRight`
+- **Tail** (`i === length - 1`): Uses direction from previous segment → `tailUp`/`tailDown`/`tailLeft`/`tailRight`, or falls back to `bodyHoriz`/`bodyVert`
+- **Body** (middle segments): Compares `dirIn` (from previous segment) and `dirOut` (to next segment):
+  - Same direction → `bodyHoriz` or `bodyVert`
+  - Different directions → looked up in `CORNER_MAP` (`cornerLD`, `cornerRD`, `cornerLU`, `cornerRU`)
+- **Wrap-aware**: `dirBetween()` uses `enableWrap` option to handle wrap-around adjacency
+
+### Direction & Corner Maps (`snake.js:94-110`)
+
+```js
+// Direction offset → name
+const DIR_KEY = { '0,-1': 'Up', '0,1': 'Down', '-1,0': 'Left', '1,0': 'Right' };
+
+// Incoming→outgoing direction → corner shape
+const CORNER_MAP = {
+  '1,0->0,1': 'cornerLD', // right→down
+  '0,-1->1,0': 'cornerRD', // up→right
+  '-1,0->0,1': 'cornerRD', // left→down
+  '0,-1->-1,0': 'cornerLD', // up→left
+  '1,0->0,-1': 'cornerLU', // right→up
+  '0,1->1,0': 'cornerRU', // down→right
+  '-1,0->0,-1': 'cornerRU', // left→up
+  '0,1->-1,0': 'cornerLU', // down→left
+};
+```
+
+### Adding New Segment Shapes
+
+To add a new shape:
+
+1. Add a drawing function to `BITMAP_DRAWERS` — receives `(ctx, palette)`, draws on 25×25 canvas
+2. Add the shape key to `_getSegmentBitmapKey()` logic where appropriate
+3. No changes needed to `_createBitmaps()` — it iterates all keys in `BITMAP_DRAWERS` automatically
+4. No changes needed to `_draw()` — it uses the key returned by `_getSegmentBitmapKey()` directly
+
 ## Architecture
 
 - **Files**:
