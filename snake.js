@@ -252,7 +252,6 @@ const TILE_RENDERERS = {
   },
 };
 
-// eslint-disable-next-line no-unused-vars -- accessed from index.html
 class TimerManager {
   constructor() {
     this._timers = {};
@@ -292,6 +291,7 @@ class TimerManager {
   }
 }
 
+// eslint-disable-next-line no-unused-vars -- accessed from index.html
 class SnakeGame {
   constructor(container, options = {}) {
     this.container = container;
