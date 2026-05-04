@@ -236,6 +236,45 @@ const TILE_RENDERERS = {
 };
 
 // eslint-disable-next-line no-unused-vars -- accessed from index.html
+class TimerManager {
+  constructor() {
+    this._timers = {};
+  }
+
+  _clearExisting(name) {
+    if (this._timers[name]) {
+      const t = this._timers[name];
+      if (t.type === 'interval') clearInterval(t.id);
+      else clearTimeout(t.id);
+      delete this._timers[name];
+    }
+  }
+
+  setInterval(name, fn, ms) {
+    this._clearExisting(name);
+    const id = setInterval(fn, ms);
+    this._timers[name] = { id, type: 'interval' };
+    return id;
+  }
+
+  setTimeout(name, fn, ms) {
+    this._clearExisting(name);
+    const id = setTimeout(fn, ms);
+    this._timers[name] = { id, type: 'timeout' };
+    return id;
+  }
+
+  clear(name) {
+    this._clearExisting(name);
+  }
+
+  clearAll() {
+    for (const name of Object.keys(this._timers)) {
+      this.clear(name);
+    }
+  }
+}
+
 class SnakeGame {
   constructor(container, options = {}) {
     this.container = container;
@@ -318,15 +357,7 @@ class SnakeGame {
   }
 
   _clearAllTimers() {
-    clearInterval(this.gameLoop);
-    clearInterval(this.timerInterval);
-    clearTimeout(this.warningTimeout);
-    clearInterval(this.bonusFoodInterval);
-    clearTimeout(this.bonusFoodTimeout);
-    clearInterval(this.bonusFoodTimer);
-    clearInterval(this.scoreBonusInterval);
-    clearInterval(this.wormholeTimer);
-    clearTimeout(this.wormholeLifetime);
+    this.timers.clearAll();
   }
 
   init() {
@@ -349,7 +380,7 @@ class SnakeGame {
     this.warningElapsed = 0;
     this.wormholeEntry = null;
     this.wormholeExit = null;
-    this._clearAllTimers();
+    this.timers = new TimerManager();
     this.freeTiles = this.COLS * this.ROWS;
     if (this.options.enableWalls) {
       this.freeTiles -= WALLS.length;
@@ -425,12 +456,15 @@ class SnakeGame {
     );
     this.wormholeEntry = entry;
     this.wormholeExit = exit;
-    clearTimeout(this.wormholeLifetime);
-    this.wormholeLifetime = setTimeout(() => {
-      this.wormholeEntry = null;
-      this.wormholeExit = null;
-      this._draw();
-    }, WORMHOLE_LIFETIME_MS);
+    this.timers.setTimeout(
+      'wormholeLifetime',
+      () => {
+        this.wormholeEntry = null;
+        this.wormholeExit = null;
+        this._draw();
+      },
+      WORMHOLE_LIFETIME_MS
+    );
   }
 
   _placeBonusFood() {
@@ -446,34 +480,44 @@ class SnakeGame {
       (this.options.enableWalls && WALLS.some((w) => w.x === pos.x && w.y === pos.y))
     );
     this.bonusFood = pos;
-    this.bonusFoodInterval = setInterval(() => this._moveBonusFood(), this.currentSpeed + 60);
-    this.bonusFoodTimeout = setTimeout(() => {
-      clearInterval(this.bonusFoodInterval);
-      this.bonusFood = null;
-    }, BONUS_FOOD_LIFETIME_MS);
+    this.timers.setInterval('bonusFoodInterval', () => this._moveBonusFood(), this.currentSpeed + 60);
+    this.timers.setTimeout(
+      'bonusFoodTimeout',
+      () => {
+        this.timers.clear('bonusFoodInterval');
+        this.bonusFood = null;
+      },
+      BONUS_FOOD_LIFETIME_MS
+    );
   }
 
   _startBonusFoodTimer() {
     if (!this.options.enableTimedBonusFood || !this.options.enableBonusFood) {
       return;
     }
-    clearInterval(this.bonusFoodTimer);
-    this.bonusFoodTimer = setInterval(() => {
-      if (!this.bonusFood) {
-        this._placeBonusFood();
-      }
-    }, BONUS_FOOD_SPAWN_INTERVAL_MS);
+    this.timers.setInterval(
+      'bonusFoodTimer',
+      () => {
+        if (!this.bonusFood) {
+          this._placeBonusFood();
+        }
+      },
+      BONUS_FOOD_SPAWN_INTERVAL_MS
+    );
   }
 
   _startWormholeTimer() {
     if (!this.options.enableWormholes) return;
-    clearInterval(this.wormholeTimer);
-    this.wormholeTimer = setInterval(() => {
-      if (!this.wormholeEntry) {
-        this._placeWormholes();
-        this._draw();
-      }
-    }, WORMHOLE_SPAWN_INTERVAL_MS);
+    this.timers.setInterval(
+      'wormholeTimer',
+      () => {
+        if (!this.wormholeEntry) {
+          this._placeWormholes();
+          this._draw();
+        }
+      },
+      WORMHOLE_SPAWN_INTERVAL_MS
+    );
   }
 
   _moveBonusFood() {
@@ -507,14 +551,17 @@ class SnakeGame {
   }
 
   _startBonusDecay() {
-    clearInterval(this.scoreBonusInterval);
-    this.scoreBonusInterval = setInterval(() => {
-      this.scoreBonus = Math.max(0, this.scoreBonus - 1);
-      this.bonusElement.textContent = `Bonus: ${this.scoreBonus}`;
-      if (this.scoreBonus === 0) {
-        clearInterval(this.scoreBonusInterval);
-      }
-    }, SCORE_BONUS_DECAY_INTERVAL_MS);
+    this.timers.setInterval(
+      'scoreBonusInterval',
+      () => {
+        this.scoreBonus = Math.max(0, this.scoreBonus - 1);
+        this.bonusElement.textContent = `Bonus: ${this.scoreBonus}`;
+        if (this.scoreBonus === 0) {
+          this.timers.clear('scoreBonusInterval');
+        }
+      },
+      SCORE_BONUS_DECAY_INTERVAL_MS
+    );
   }
 
   _isFoodEnclosed(pos) {
@@ -655,8 +702,8 @@ class SnakeGame {
     this._placeFood();
     if (this.options.enableSpeedUp && this.currentSpeed > this.MIN_SPEED) {
       this.currentSpeed = Math.max(this.MIN_SPEED, this.currentSpeed - this.SPEED_STEP);
-      clearInterval(this.gameLoop);
-      this.gameLoop = setInterval(
+      this.timers.setInterval(
+        'gameLoop',
         () => this._update(),
         this.speedBoostActive ? this.currentSpeed / SPEED_BOOST_FACTOR : this.currentSpeed
       );
@@ -673,8 +720,8 @@ class SnakeGame {
         this.snake.splice(shrunkLen);
       }
     }
-    clearInterval(this.bonusFoodInterval);
-    clearTimeout(this.bonusFoodTimeout);
+    this.timers.clear('bonusFoodInterval');
+    this.timers.clear('bonusFoodTimeout');
     this.bonusFood = null;
   }
 
@@ -892,7 +939,7 @@ class SnakeGame {
       nextHead.x = this.wormholeExit.x;
       nextHead.y = this.wormholeExit.y;
       if (this.options.enableWrap) this._wrapPos(nextHead);
-      clearTimeout(this.wormholeLifetime);
+      this.timers.clear('wormholeLifetime');
       this.wormholeEntry = null;
       this.wormholeExit = null;
     }
@@ -973,26 +1020,26 @@ class SnakeGame {
   }
 
   _enterWarning() {
-    clearInterval(this.gameLoop);
-    clearInterval(this.bonusFoodInterval);
+    this.timers.clear('gameLoop');
+    this.timers.clear('bonusFoodInterval');
     this.state = 'warning';
     this.warningStart = Date.now();
     this.warningElapsed = 0;
     this.messageElement.textContent = '';
     this.graceDirection = { x: this.direction.x, y: this.direction.y };
     this._draw();
-    clearTimeout(this.warningTimeout);
-    this.warningTimeout = setTimeout(
+    this.timers.setTimeout(
+      'warningTimeout',
       () => this._gameOver(),
       this.speedBoostActive ? WARNING_TIMEOUT_MS / SPEED_BOOST_FACTOR : WARNING_TIMEOUT_MS
     );
   }
 
   _enterIgnored() {
-    clearInterval(this.gameLoop);
-    clearInterval(this.bonusFoodInterval);
-    clearTimeout(this.bonusFoodTimeout);
-    clearInterval(this.scoreBonusInterval);
+    this.timers.clear('gameLoop');
+    this.timers.clear('bonusFoodInterval');
+    this.timers.clear('bonusFoodTimeout');
+    this.timers.clear('scoreBonusInterval');
     this._deactivateSpeedBoost();
     this.state = 'ignored';
     this.inputBuffer = [];
@@ -1008,8 +1055,8 @@ class SnakeGame {
     if (this.options.mode === MODE_CONSTRICTOR) {
       this.startGrowth = 14;
     }
-    this.gameLoop = setInterval(() => this._update(), this.currentSpeed);
-    this.timerInterval = setInterval(() => this._updateTimerDisplay(), 1000);
+    this.timers.setInterval('gameLoop', () => this._update(), this.currentSpeed);
+    this.timers.setInterval('timerInterval', () => this._updateTimerDisplay(), 1000);
     if (this.options.enableScoreBonus && this.scoreBonus > 0) {
       this._startBonusDecay();
     }
@@ -1042,11 +1089,15 @@ class SnakeGame {
 
   _resumeCommonTimers() {
     if (this.options.enableBonusFood && this.bonusFood) {
-      this.bonusFoodInterval = setInterval(() => this._moveBonusFood(), this.currentSpeed + 60);
-      this.bonusFoodTimeout = setTimeout(() => {
-        clearInterval(this.bonusFoodInterval);
-        this.bonusFood = null;
-      }, BONUS_FOOD_LIFETIME_MS);
+      this.timers.setInterval('bonusFoodInterval', () => this._moveBonusFood(), this.currentSpeed + 60);
+      this.timers.setTimeout(
+        'bonusFoodTimeout',
+        () => {
+          this.timers.clear('bonusFoodInterval');
+          this.bonusFood = null;
+        },
+        BONUS_FOOD_LIFETIME_MS
+      );
     }
     if (this.options.enableScoreBonus && this.scoreBonus > 0) {
       this._startBonusDecay();
@@ -1060,11 +1111,12 @@ class SnakeGame {
     this.wasPaused = false;
     if (this.state === 'playing') {
       this.startTime = Date.now() - this.elapsed;
-      this.gameLoop = setInterval(
+      this.timers.setInterval(
+        'gameLoop',
         () => this._update(),
         this.speedBoostActive ? this.currentSpeed / SPEED_BOOST_FACTOR : this.currentSpeed
       );
-      this.timerInterval = setInterval(() => this._updateTimerDisplay(), 1000);
+      this.timers.setInterval('timerInterval', () => this._updateTimerDisplay(), 1000);
       this._resumeCommonTimers();
       if (this.options.enableTimedBonusFood) {
         this._startBonusFoodTimer();
@@ -1074,7 +1126,11 @@ class SnakeGame {
       }
     } else if (this.state === 'warning') {
       const warningDuration = this.speedBoostActive ? WARNING_TIMEOUT_MS / SPEED_BOOST_FACTOR : WARNING_TIMEOUT_MS;
-      this.warningTimeout = setTimeout(() => this._gameOver(), Math.max(0, warningDuration - this.warningElapsed));
+      this.timers.setTimeout(
+        'warningTimeout',
+        () => this._gameOver(),
+        Math.max(0, warningDuration - this.warningElapsed)
+      );
       this._resumeCommonTimers();
     } else if (this.state === 'ignored') {
       this._resumeCommonTimers();
@@ -1093,8 +1149,7 @@ class SnakeGame {
       return false;
     }
     this.speedBoostActive = true;
-    clearInterval(this.gameLoop);
-    this.gameLoop = setInterval(() => this._update(), this.currentSpeed / SPEED_BOOST_FACTOR);
+    this.timers.setInterval('gameLoop', () => this._update(), this.currentSpeed / SPEED_BOOST_FACTOR);
     return true;
   }
 
@@ -1103,8 +1158,7 @@ class SnakeGame {
       return;
     }
     this.speedBoostActive = false;
-    clearInterval(this.gameLoop);
-    this.gameLoop = setInterval(() => this._update(), this.currentSpeed);
+    this.timers.setInterval('gameLoop', () => this._update(), this.currentSpeed);
   }
 
   _handleKeydown(e) {
@@ -1144,21 +1198,24 @@ class SnakeGame {
       if (wall || boundary || self) {
         return;
       }
-      clearTimeout(this.warningTimeout);
+      this.timers.clear('warningTimeout');
       this.direction = newDir;
       this.nextDirection = newDir;
       this.graceDirection = { x: 0, y: 0 };
       this.state = 'playing';
       this.messageElement.textContent = '';
       this.speedBoostActive = false;
-      this.gameLoop = setInterval(() => this._update(), this.currentSpeed);
+      this.timers.setInterval('gameLoop', () => this._update(), this.currentSpeed);
       if (this.options.enableBonusFood && this.bonusFood) {
-        this.bonusFoodInterval = setInterval(() => this._moveBonusFood(), this.currentSpeed + 60);
-        clearTimeout(this.bonusFoodTimeout);
-        this.bonusFoodTimeout = setTimeout(() => {
-          clearInterval(this.bonusFoodInterval);
-          this.bonusFood = null;
-        }, BONUS_FOOD_LIFETIME_MS);
+        this.timers.setInterval('bonusFoodInterval', () => this._moveBonusFood(), this.currentSpeed + 60);
+        this.timers.setTimeout(
+          'bonusFoodTimeout',
+          () => {
+            this.timers.clear('bonusFoodInterval');
+            this.bonusFood = null;
+          },
+          BONUS_FOOD_LIFETIME_MS
+        );
       }
       return;
     }
@@ -1174,7 +1231,7 @@ class SnakeGame {
       this.nextDirection = newDir;
       this.state = 'playing';
       this.messageElement.textContent = '';
-      this.gameLoop = setInterval(() => this._update(), this.currentSpeed);
+      this.timers.setInterval('gameLoop', () => this._update(), this.currentSpeed);
       this._resumeCommonTimers();
       return;
     }
@@ -1204,8 +1261,8 @@ class SnakeGame {
       if (this.options.enableInstantMovement && acceptedInput && this.state === 'playing') {
         this._update();
         if (this.state === 'playing') {
-          clearInterval(this.gameLoop);
-          this.gameLoop = setInterval(
+          this.timers.setInterval(
+            'gameLoop',
             () => this._update(),
             this.speedBoostActive ? this.currentSpeed / SPEED_BOOST_FACTOR : this.currentSpeed
           );
