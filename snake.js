@@ -492,8 +492,7 @@ class SnakeGame {
       !this.snake.some((s) => s.x === next.x && s.y === next.y) &&
       !(this.options.enableWalls && WALLS.some((w) => w.x === next.x && w.y === next.y));
     if (this.options.enableWrap) {
-      next.x = (next.x + this.COLS) % this.COLS;
-      next.y = (next.y + this.ROWS) % this.ROWS;
+      this._wrapPos(next);
       if (obstacleFree()) {
         this.bonusFood = next;
       }
@@ -586,6 +585,22 @@ class SnakeGame {
     return foodSize < largestOther;
   }
 
+  _wrapPos(pos) {
+    if (this.options.enableWrap) {
+      pos.x = (pos.x + this.COLS) % this.COLS;
+      pos.y = (pos.y + this.ROWS) % this.ROWS;
+    }
+    return pos;
+  }
+
+  _getCollision(pos) {
+    return {
+      wall: this.options.enableWalls && WALLS.some((w) => w.x === pos.x && w.y === pos.y),
+      boundary: pos.x < 0 || pos.x >= this.COLS || pos.y < 0 || pos.y >= this.ROWS,
+      self: this.snake.some((s) => s.x === pos.x && s.y === pos.y),
+    };
+  }
+
   _hasAnySafeMove() {
     const dirs = [
       { x: 0, y: -1 },
@@ -594,15 +609,9 @@ class SnakeGame {
       { x: 1, y: 0 },
     ];
     for (const dir of dirs) {
-      const nextHead = { x: this.snake[0].x + dir.x, y: this.snake[0].y + dir.y };
-      if (this.options.enableWrap) {
-        nextHead.x = (nextHead.x + this.COLS) % this.COLS;
-        nextHead.y = (nextHead.y + this.ROWS) % this.ROWS;
-      }
-      const hitsWall = this.options.enableWalls && WALLS.some((w) => w.x === nextHead.x && w.y === nextHead.y);
-      const hitsBoundary = nextHead.x < 0 || nextHead.x >= this.COLS || nextHead.y < 0 || nextHead.y >= this.ROWS;
-      const hitsSelf = this.snake.some((s) => s.x === nextHead.x && s.y === nextHead.y);
-      if (!hitsWall && !hitsBoundary && !hitsSelf) {
+      const pos = this._wrapPos({ x: this.snake[0].x + dir.x, y: this.snake[0].y + dir.y });
+      const c = this._getCollision(pos);
+      if (!c.wall && !c.boundary && !c.self) {
         return true;
       }
     }
@@ -610,15 +619,9 @@ class SnakeGame {
   }
 
   _isDirSafe(dir) {
-    const nextHead = { x: this.snake[0].x + dir.x, y: this.snake[0].y + dir.y };
-    if (this.options.enableWrap) {
-      nextHead.x = (nextHead.x + this.COLS) % this.COLS;
-      nextHead.y = (nextHead.y + this.ROWS) % this.ROWS;
-    }
-    const hitsWall = this.options.enableWalls && WALLS.some((w) => w.x === nextHead.x && w.y === nextHead.y);
-    const hitsBoundary = nextHead.x < 0 || nextHead.x >= this.COLS || nextHead.y < 0 || nextHead.y >= this.ROWS;
-    const hitsSelf = this.snake.some((s) => s.x === nextHead.x && s.y === nextHead.y);
-    return !hitsWall && !hitsBoundary && !hitsSelf;
+    const pos = this._wrapPos({ x: this.snake[0].x + dir.x, y: this.snake[0].y + dir.y });
+    const c = this._getCollision(pos);
+    return !c.wall && !c.boundary && !c.self;
   }
 
   _eatRegularFood() {
@@ -878,10 +881,7 @@ class SnakeGame {
 
     const nextHead = { x: this.snake[0].x + this.direction.x, y: this.snake[0].y + this.direction.y };
 
-    if (this.options.enableWrap) {
-      nextHead.x = (nextHead.x + this.COLS) % this.COLS;
-      nextHead.y = (nextHead.y + this.ROWS) % this.ROWS;
-    }
+    if (this.options.enableWrap) this._wrapPos(nextHead);
 
     if (
       this.options.enableWormholes &&
@@ -891,21 +891,16 @@ class SnakeGame {
     ) {
       nextHead.x = this.wormholeExit.x;
       nextHead.y = this.wormholeExit.y;
-      if (this.options.enableWrap) {
-        nextHead.x = (nextHead.x + this.COLS) % this.COLS;
-        nextHead.y = (nextHead.y + this.ROWS) % this.ROWS;
-      }
+      if (this.options.enableWrap) this._wrapPos(nextHead);
       clearTimeout(this.wormholeLifetime);
       this.wormholeEntry = null;
       this.wormholeExit = null;
     }
 
-    const hitsWall = this.options.enableWalls && WALLS.some((w) => w.x === nextHead.x && w.y === nextHead.y);
-    const hitsBoundary = nextHead.x < 0 || nextHead.x >= this.COLS || nextHead.y < 0 || nextHead.y >= this.ROWS;
-    const hitsSelf = this.snake.some((s) => s.x === nextHead.x && s.y === nextHead.y);
+    const { wall, boundary, self } = this._getCollision(nextHead);
 
-    if (hitsWall || hitsBoundary || hitsSelf) {
-      if (this.options.mode === MODE_CONSTRICTOR && hitsSelf) {
+    if (wall || boundary || self) {
+      if (this.options.mode === MODE_CONSTRICTOR && self) {
         if (this._hasAnySafeMove()) {
           this._enterIgnored();
         } else {
@@ -1144,11 +1139,9 @@ class SnakeGame {
     }
 
     if (this.state === 'warning') {
-      const newHead = { x: this.snake[0].x + newDir.x, y: this.snake[0].y + newDir.y };
-      const hitsWall = this.options.enableWalls && WALLS.some((w) => w.x === newHead.x && w.y === newHead.y);
-      const hitsBoundary = newHead.x < 0 || newHead.x >= this.COLS || newHead.y < 0 || newHead.y >= this.ROWS;
-      const hitsSelf = this.snake.some((s) => s.x === newHead.x && s.y === newHead.y);
-      if (hitsWall || hitsBoundary || hitsSelf) {
+      const newHead = this._wrapPos({ x: this.snake[0].x + newDir.x, y: this.snake[0].y + newDir.y });
+      const { wall, boundary, self } = this._getCollision(newHead);
+      if (wall || boundary || self) {
         return;
       }
       clearTimeout(this.warningTimeout);
@@ -1171,15 +1164,9 @@ class SnakeGame {
     }
 
     if (this.state === 'ignored') {
-      const newHead = { x: this.snake[0].x + newDir.x, y: this.snake[0].y + newDir.y };
-      if (this.options.enableWrap) {
-        newHead.x = (newHead.x + this.COLS) % this.COLS;
-        newHead.y = (newHead.y + this.ROWS) % this.ROWS;
-      }
-      const hitsWall = this.options.enableWalls && WALLS.some((w) => w.x === newHead.x && w.y === newHead.y);
-      const hitsBoundary = newHead.x < 0 || newHead.x >= this.COLS || newHead.y < 0 || newHead.y >= this.ROWS;
-      const hitsSelf = this.snake.some((s) => s.x === newHead.x && s.y === newHead.y);
-      if (hitsWall || hitsBoundary || hitsSelf) {
+      const newHead = this._wrapPos({ x: this.snake[0].x + newDir.x, y: this.snake[0].y + newDir.y });
+      const { wall, boundary, self } = this._getCollision(newHead);
+      if (wall || boundary || self) {
         return;
       }
       this.inputBuffer = [];
