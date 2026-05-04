@@ -119,117 +119,117 @@ const PALETTE_BOOST = { body: '#4a7a4a', head: '#f0e68c', eye: '#0d1a0d' };
 const BITMAP_DRAWERS = {
   headUp(ctx, p) {
     ctx.fillStyle = p.body;
-    ctx.fillRect(0, 0, 25, 25);
+    ctx.fillRect(0, 0, 26, 26);
     ctx.fillStyle = p.head;
-    ctx.fillRect(2, 2, 21, 21);
+    ctx.fillRect(1, 1, 24, 24);
     ctx.fillStyle = p.eye;
-    ctx.fillRect(5, 3, 5, 4);
-    ctx.fillRect(15, 3, 5, 4);
+    ctx.fillRect(5, 2, 5, 4);
+    ctx.fillRect(16, 2, 5, 4);
   },
   headDown(ctx, p) {
     ctx.fillStyle = p.body;
-    ctx.fillRect(0, 0, 25, 25);
+    ctx.fillRect(0, 0, 26, 26);
     ctx.fillStyle = p.head;
-    ctx.fillRect(2, 2, 21, 21);
+    ctx.fillRect(1, 1, 24, 24);
     ctx.fillStyle = p.eye;
-    ctx.fillRect(5, 18, 5, 4);
-    ctx.fillRect(15, 18, 5, 4);
+    ctx.fillRect(5, 20, 5, 4);
+    ctx.fillRect(16, 20, 5, 4);
   },
   headLeft(ctx, p) {
     ctx.fillStyle = p.body;
-    ctx.fillRect(0, 0, 25, 25);
+    ctx.fillRect(0, 0, 26, 26);
     ctx.fillStyle = p.head;
-    ctx.fillRect(2, 2, 21, 21);
+    ctx.fillRect(1, 1, 24, 24);
     ctx.fillStyle = p.eye;
-    ctx.fillRect(3, 5, 4, 5);
-    ctx.fillRect(3, 15, 4, 5);
+    ctx.fillRect(2, 5, 4, 5);
+    ctx.fillRect(2, 16, 4, 5);
   },
   headRight(ctx, p) {
     ctx.fillStyle = p.body;
-    ctx.fillRect(0, 0, 25, 25);
+    ctx.fillRect(0, 0, 26, 26);
     ctx.fillStyle = p.head;
-    ctx.fillRect(2, 2, 21, 21);
+    ctx.fillRect(1, 1, 24, 24);
     ctx.fillStyle = p.eye;
-    ctx.fillRect(18, 5, 4, 5);
-    ctx.fillRect(18, 15, 4, 5);
+    ctx.fillRect(20, 5, 4, 5);
+    ctx.fillRect(20, 16, 4, 5);
   },
   bodyHoriz(ctx, p) {
     ctx.fillStyle = p.body;
-    ctx.fillRect(0, 0, 25, 25);
+    ctx.fillRect(0, 0, 26, 26);
   },
   bodyVert(ctx, p) {
     ctx.fillStyle = p.body;
-    ctx.fillRect(0, 0, 25, 25);
+    ctx.fillRect(0, 0, 26, 26);
   },
   tailUp(ctx, p) {
     ctx.fillStyle = p.body;
-    ctx.fillRect(0, 12.5, 25, 12.5);
+    ctx.fillRect(0, 13, 26, 13);
     ctx.beginPath();
-    ctx.arc(12.5, 12.5, 12.5, Math.PI, 2 * Math.PI);
+    ctx.arc(13, 13, 13, Math.PI, 2 * Math.PI);
     ctx.fill();
   },
   tailDown(ctx, p) {
     ctx.fillStyle = p.body;
-    ctx.fillRect(0, 0, 25, 12.5);
+    ctx.fillRect(0, 0, 26, 13);
     ctx.beginPath();
-    ctx.arc(12.5, 12.5, 12.5, 0, Math.PI);
+    ctx.arc(13, 13, 13, 0, Math.PI);
     ctx.fill();
   },
   tailLeft(ctx, p) {
     ctx.fillStyle = p.body;
-    ctx.fillRect(12.5, 0, 12.5, 25);
+    ctx.fillRect(13, 0, 13, 26);
     ctx.beginPath();
-    ctx.arc(12.5, 12.5, 12.5, Math.PI / 2, (3 * Math.PI) / 2);
+    ctx.arc(13, 13, 13, Math.PI / 2, (3 * Math.PI) / 2);
     ctx.fill();
   },
   tailRight(ctx, p) {
     ctx.fillStyle = p.body;
-    ctx.fillRect(0, 0, 12.5, 25);
+    ctx.fillRect(0, 0, 13, 26);
     ctx.beginPath();
-    ctx.arc(12.5, 12.5, 12.5, -Math.PI / 2, Math.PI / 2);
+    ctx.arc(13, 13, 13, -Math.PI / 2, Math.PI / 2);
     ctx.fill();
   },
   cornerRD(ctx, p) {
     ctx.fillStyle = p.body;
-    ctx.fillRect(0, 0, 12.5, 12.5);
-    ctx.fillRect(0, 12.5, 12.5, 12.5);
-    ctx.fillRect(12.5, 12.5, 12.5, 12.5);
+    ctx.fillRect(0, 0, 13, 13);
+    ctx.fillRect(0, 13, 13, 13);
+    ctx.fillRect(13, 13, 13, 13);
     ctx.beginPath();
-    ctx.moveTo(12.5, 12.5);
-    ctx.arc(12.5, 12.5, 12.5, (Math.PI * 3) / 2, 0);
+    ctx.moveTo(13, 13);
+    ctx.arc(13, 13, 13, (Math.PI * 3) / 2, 0);
     ctx.closePath();
     ctx.fill();
   },
   cornerLD(ctx, p) {
     ctx.fillStyle = p.body;
-    ctx.fillRect(12.5, 0, 12.5, 12.5);
-    ctx.fillRect(0, 12.5, 12.5, 12.5);
-    ctx.fillRect(12.5, 12.5, 12.5, 12.5);
+    ctx.fillRect(13, 0, 13, 13);
+    ctx.fillRect(0, 13, 13, 13);
+    ctx.fillRect(13, 13, 13, 13);
     ctx.beginPath();
-    ctx.moveTo(12.5, 12.5);
-    ctx.arc(12.5, 12.5, 12.5, Math.PI, (Math.PI * 3) / 2);
+    ctx.moveTo(13, 13);
+    ctx.arc(13, 13, 13, Math.PI, (Math.PI * 3) / 2);
     ctx.closePath();
     ctx.fill();
   },
   cornerRU(ctx, p) {
     ctx.fillStyle = p.body;
-    ctx.fillRect(0, 0, 12.5, 12.5);
-    ctx.fillRect(12.5, 0, 12.5, 12.5);
-    ctx.fillRect(0, 12.5, 12.5, 12.5);
+    ctx.fillRect(0, 0, 13, 13);
+    ctx.fillRect(13, 0, 13, 13);
+    ctx.fillRect(0, 13, 13, 13);
     ctx.beginPath();
-    ctx.moveTo(12.5, 12.5);
-    ctx.arc(12.5, 12.5, 12.5, 0, Math.PI / 2);
+    ctx.moveTo(13, 13);
+    ctx.arc(13, 13, 13, 0, Math.PI / 2);
     ctx.closePath();
     ctx.fill();
   },
   cornerLU(ctx, p) {
     ctx.fillStyle = p.body;
-    ctx.fillRect(0, 0, 12.5, 12.5);
-    ctx.fillRect(12.5, 0, 12.5, 12.5);
-    ctx.fillRect(12.5, 12.5, 12.5, 12.5);
+    ctx.fillRect(0, 0, 13, 13);
+    ctx.fillRect(13, 0, 13, 13);
+    ctx.fillRect(13, 13, 13, 13);
     ctx.beginPath();
-    ctx.moveTo(12.5, 12.5);
-    ctx.arc(12.5, 12.5, 12.5, Math.PI / 2, Math.PI);
+    ctx.moveTo(13, 13);
+    ctx.arc(13, 13, 13, Math.PI / 2, Math.PI);
     ctx.closePath();
     ctx.fill();
   },
@@ -806,8 +806,8 @@ class SnakeGame {
 
   _makeBitmap(key, palette) {
     const canvas = document.createElement('canvas');
-    canvas.width = this.CELL_SIZE;
-    canvas.height = this.CELL_SIZE;
+    canvas.width = this.CELL_SIZE + 1;
+    canvas.height = this.CELL_SIZE + 1;
     const ctx = canvas.getContext('2d');
     BITMAP_DRAWERS[key](ctx, palette);
     return canvas;
