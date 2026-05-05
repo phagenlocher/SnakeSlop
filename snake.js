@@ -1915,8 +1915,10 @@ class SnakeGame {
         () => this._gameOver(),
         Math.max(0, warningDuration - this.warningElapsed)
       );
+      this.timers.setInterval('timerInterval', () => this._updateTimerDisplay(), 1000);
       this._resumeCommonTimers();
     } else if (this.state === STATE.IGNORED) {
+      this.timers.setInterval('timerInterval', () => this._updateTimerDisplay(), 1000);
       this._resumeCommonTimers();
       this.bonusFood.startTimers();
       this.wormholes.startTimers();
