@@ -706,7 +706,7 @@ class SnakeGame {
     this.growth = 1;
     if (this.snake.length >= this.freeTiles) {
       this._gameOver();
-      return true;
+      return;
     }
     if (
       this.options.enableBonusFood &&
@@ -725,7 +725,6 @@ class SnakeGame {
         this.speedBoostActive ? this.currentSpeed / SPEED_BOOST_FACTOR : this.currentSpeed
       );
     }
-    return false;
   }
 
   _eatBonusFood() {
@@ -915,7 +914,7 @@ class SnakeGame {
     return CORNER_MAP[`${inName}->${outName}`];
   }
 
-  _update() {
+  _processInput() {
     if (this.options.enableInputBuffer) {
       const prevDir = { x: this.direction.x, y: this.direction.y };
       let effectiveDir =
@@ -951,7 +950,9 @@ class SnakeGame {
     } else {
       this.direction = this.nextDirection;
     }
+  }
 
+  _resolveNextHead() {
     const nextHead = { x: this.snake[0].x + this.direction.x, y: this.snake[0].y + this.direction.y };
 
     if (this.options.enableWrap) this._wrapPos(nextHead);
@@ -970,6 +971,10 @@ class SnakeGame {
       this.wormholeExit = null;
     }
 
+    return nextHead;
+  }
+
+  _processCollision(nextHead) {
     const { wall, boundary, self } = this._getCollision(nextHead);
 
     if (wall || boundary || self) {
@@ -979,69 +984,76 @@ class SnakeGame {
         } else {
           this._gameOver();
         }
-        return;
+        return true;
       }
       if (this.options.enableGracePeriod) {
         this._enterWarning();
       } else {
         this._gameOver();
       }
-      return;
+      return true;
     }
 
-    const head = nextHead;
+    return false;
+  }
 
-    this.snake.unshift(head);
-
-    if (this.options.mode === MODE_CONSTRICTOR) {
-      if (head.x === this.food.x && head.y === this.food.y) {
-        if (this.snake.length >= this.freeTiles) {
-          this._gameOver();
-          return;
-        }
-        this._placeFood();
+  _processConstrictorTurn(head) {
+    if (head.x === this.food.x && head.y === this.food.y) {
+      if (this.snake.length >= this.freeTiles) {
+        this._gameOver();
+        return;
       }
+      this._placeFood();
+    }
 
-      if (this.startGrowth > 0) {
-        this.startGrowth--;
-      } else if (this.growth > 0) {
+    if (this.startGrowth > 0) {
+      this.startGrowth--;
+    } else if (this.growth > 0) {
+      this.growth--;
+    } else {
+      this.snake.pop();
+    }
+
+    if (this._isFoodEnclosed(this.food)) {
+      this._eatRegularFood();
+      if (this.state === STATE.OVER) return;
+    }
+
+    if (this.options.enableBonusFood && this.bonusFood && this._isFoodEnclosed(this.bonusFood)) {
+      this._eatBonusFood();
+    }
+  }
+
+  _processClassicTurn(head) {
+    if (head.x === this.food.x && head.y === this.food.y) {
+      this._eatRegularFood();
+      if (this.state === STATE.OVER) return;
+    } else {
+      if (this.growth > 0) {
         this.growth--;
       } else {
         this.snake.pop();
       }
-
-      if (this._isFoodEnclosed(this.food)) {
-        if (this._eatRegularFood()) {
-          return;
-        }
-      }
-
-      if (this.options.enableBonusFood && this.bonusFood && this._isFoodEnclosed(this.bonusFood)) {
-        this._eatBonusFood();
-      }
-    } else {
-      if (head.x === this.food.x && head.y === this.food.y) {
-        if (this._eatRegularFood()) {
-          return;
-        }
-      } else {
-        if (this.growth > 0) {
-          this.growth--;
-        } else {
-          this.snake.pop();
-        }
-      }
-
-      if (
-        this.options.enableBonusFood &&
-        this.bonusFood &&
-        head.x === this.bonusFood.x &&
-        head.y === this.bonusFood.y
-      ) {
-        this._eatBonusFood();
-      }
     }
 
+    if (this.options.enableBonusFood && this.bonusFood && head.x === this.bonusFood.x && head.y === this.bonusFood.y) {
+      this._eatBonusFood();
+    }
+  }
+
+  _update() {
+    this._processInput();
+    const nextHead = this._resolveNextHead();
+    if (this._processCollision(nextHead)) {
+      return;
+    }
+    this.snake.unshift(nextHead);
+    if (this.options.mode === MODE_CONSTRICTOR) {
+      this._processConstrictorTurn(nextHead);
+    } else {
+      this._processClassicTurn(nextHead);
+    }
+    if (this.state === STATE.OVER) return;
     this._draw();
   }
 
@@ -1181,11 +1193,10 @@ class SnakeGame {
 
   _activateSpeedBoost() {
     if (!this.options.enableSpeedBoost || this.speedBoostActive) {
-      return false;
+      return;
     }
     this.speedBoostActive = true;
     this.timers.setInterval('gameLoop', () => this._update(), this.currentSpeed / SPEED_BOOST_FACTOR);
-    return true;
   }
 
   _deactivateSpeedBoost() {
@@ -1295,7 +1306,9 @@ class SnakeGame {
     }
     let acceptedInput = false;
     if (dir.x === this.direction.x && dir.y === this.direction.y) {
-      acceptedInput = this._activateSpeedBoost();
+      const wasActive = this.speedBoostActive;
+      this._activateSpeedBoost();
+      acceptedInput = this.options.enableSpeedBoost && !wasActive;
     } else if (dir.x !== -this.direction.x || dir.y !== -this.direction.y) {
       if (!this.options.enableInputBuffer) {
         this.nextDirection = dir;
