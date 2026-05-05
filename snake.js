@@ -376,6 +376,115 @@ class TimerManager {
 }
 
 /**
+ * Encapsulates snake body as an ordered array with an O(1) position lookup set.
+ * All mutations keep both representations in sync — callers never touch internals.
+ * @classdesc Provides head/tail access, indexed segment access, iteration,
+ * and O(1) occupancy checks via has(x, y).
+ */
+class SnakeBody {
+  /**
+   * @param {Point[]} points Initial segment list (head at index 0).
+   */
+  constructor(points) {
+    /** @private */
+    this._segments = [...points];
+    /** @private @type {Set<string>} */
+    this._set = this._buildSet();
+  }
+
+  /** @returns {number} Number of segments. */
+  get length() {
+    return this._segments.length;
+  }
+
+  /** @returns {Point} Head position. */
+  head() {
+    return this._segments[0];
+  }
+
+  /** @returns {Point} Tail position (last segment). */
+  tail() {
+    return this._segments[this._segments.length - 1];
+  }
+
+  /**
+   * Returns the segment at a given index.
+   * @param {number} i Segment index.
+   * @returns {Point}
+   */
+  segmentAt(i) {
+    return this._segments[i];
+  }
+
+  /**
+   * Iterates over all segments (head to tail).
+   * @param {(seg: Point, i: number) => void} fn
+   */
+  forEach(fn) {
+    this._segments.forEach(fn);
+  }
+
+  /**
+   * Prepends a segment at the head.
+   * @param {Point} p Segment to add.
+   */
+  unshift(p) {
+    this._segments.unshift(p);
+    this._set.add(this._key(p));
+  }
+
+  /**
+   * Removes and returns the tail segment.
+   * @returns {Point|undefined}
+   */
+  pop() {
+    const p = this._segments.pop();
+    if (p) this._set.delete(this._key(p));
+    return p;
+  }
+
+  /**
+   * Removes segments from `start` index to end and syncs the set.
+   * Mirrors Array.splice(n) with a single argument (cut from n onward).
+   * @param {number} start Start index.
+   */
+  splice(start) {
+    const removed = this._segments.splice(start);
+    for (const p of removed) this._set.delete(this._key(p));
+    return removed;
+  }
+
+  /**
+   * Replaces all segments with a new array (e.g. on game reset).
+   * @param {Point[]} points New segment list.
+   */
+  reset(points) {
+    this._segments = [...points];
+    this._set = this._buildSet();
+  }
+
+  /**
+   * O(1) check whether any segment occupies a grid cell.
+   * @param {number} x Grid column.
+   * @param {number} y Grid row.
+   * @returns {boolean}
+   */
+  has(x, y) {
+    return this._set.has(`${x},${y}`);
+  }
+
+  /** @private @returns {string} */
+  _key(p) {
+    return `${p.x},${p.y}`;
+  }
+
+  /** @private @returns {Set<string>} */
+  _buildSet() {
+    return new Set(this._segments.map((p) => this._key(p)));
+  }
+}
+
+/**
  * Manages the static wall layout.
  * @classdesc Handles wall rendering, collision checks, and wall-set queries.
  */
@@ -521,7 +630,7 @@ class WormholesManager {
     do {
       entry = { x: Math.floor(Math.random() * this.game.COLS), y: Math.floor(Math.random() * this.game.ROWS) };
     } while (
-      this.game.snake.some((s) => s.x === entry.x && s.y === entry.y) ||
+      this.game.snake.has(entry.x, entry.y) ||
       (this.game.food && this.game.food.x === entry.x && this.game.food.y === entry.y) ||
       this.game.bonusFood.isAt(entry.x, entry.y) ||
       this.game.walls.isWallAt(entry.x, entry.y)
@@ -530,7 +639,7 @@ class WormholesManager {
       exit = { x: Math.floor(Math.random() * this.game.COLS), y: Math.floor(Math.random() * this.game.ROWS) };
     } while (
       (exit.x === entry.x && exit.y === entry.y) ||
-      this.game.snake.some((s) => s.x === exit.x && s.y === exit.y) ||
+      this.game.snake.has(exit.x, exit.y) ||
       (this.game.food && this.game.food.x === exit.x && this.game.food.y === exit.y) ||
       this.game.bonusFood.isAt(exit.x, exit.y) ||
       this.game.walls.isWallAt(exit.x, exit.y) ||
@@ -651,7 +760,7 @@ class BonusFoodManager {
     do {
       pos = { x: Math.floor(Math.random() * this.game.COLS), y: Math.floor(Math.random() * this.game.ROWS) };
     } while (
-      this.game.snake.some((s) => s.x === pos.x && s.y === pos.y) ||
+      this.game.snake.has(pos.x, pos.y) ||
       (this.game.food && this.game.food.x === pos.x && this.game.food.y === pos.y) ||
       this.game.walls.isWallAt(pos.x, pos.y)
     );
@@ -683,8 +792,7 @@ class BonusFoodManager {
     ];
     const dir = dirs[Math.floor(Math.random() * dirs.length)];
     const next = { x: this.pos.x + dir.x, y: this.pos.y + dir.y };
-    const obstacleFree = () =>
-      !this.game.snake.some((s) => s.x === next.x && s.y === next.y) && !this.game.walls.isWallAt(next.x, next.y);
+    const obstacleFree = () => !this.game.snake.has(next.x, next.y) && !this.game.walls.isWallAt(next.x, next.y);
     if (this.game.boundary.enabled) {
       this.game.boundary.wrap(next);
       if (obstacleFree()) {
@@ -1085,7 +1193,7 @@ class CollisionResolver {
     return {
       wall: this.game.walls.isWallAt(pos.x, pos.y),
       boundary: pos.x < 0 || pos.x >= this.game.COLS || pos.y < 0 || pos.y >= this.game.ROWS,
-      self: this.game.snake.some((s) => s.x === pos.x && s.y === pos.y),
+      self: this.game.snake.has(pos.x, pos.y),
     };
   }
 
@@ -1101,7 +1209,7 @@ class CollisionResolver {
       { x: 1, y: 0 },
     ];
     for (const dir of dirs) {
-      const pos = this.game.boundary.wrap({ x: this.game.snake[0].x + dir.x, y: this.game.snake[0].y + dir.y });
+      const pos = this.game.boundary.wrap({ x: this.game.snake.head().x + dir.x, y: this.game.snake.head().y + dir.y });
       const c = this.getCollision(pos);
       if (!c.wall && !c.boundary && !c.self) {
         return true;
@@ -1116,7 +1224,7 @@ class CollisionResolver {
    * @returns {boolean} True if no wall, boundary, or self collision.
    */
   isDirSafe(dir) {
-    const pos = this.game.boundary.wrap({ x: this.game.snake[0].x + dir.x, y: this.game.snake[0].y + dir.y });
+    const pos = this.game.boundary.wrap({ x: this.game.snake.head().x + dir.x, y: this.game.snake.head().y + dir.y });
     const c = this.getCollision(pos);
     return !c.wall && !c.boundary && !c.self;
   }
@@ -1307,8 +1415,8 @@ class SnakeGame {
    * Resets snake position, score, timers, food, and redraws the canvas.
    */
   init() {
-    /** @type {Point[]} Snake body segments (head is index 0). */
-    this.snake = [{ x: 10, y: 10 }];
+    /** @type {SnakeBody} Snake body segments (head is index 0). */
+    this.snake = new SnakeBody([{ x: 10, y: 10 }]);
     /** @type {Point} Current movement direction. */
     this.direction = { x: 0, y: 0 };
     /** @type {Point} Next direction to apply (non-buffered mode). */
@@ -1359,7 +1467,7 @@ class SnakeGame {
       pos = { x: Math.floor(Math.random() * this.COLS), y: Math.floor(Math.random() * this.ROWS) };
       tries++;
     } while (
-      this.snake.some((s) => s.x === pos.x && s.y === pos.y) ||
+      this.snake.has(pos.x, pos.y) ||
       this.walls.isWallAt(pos.x, pos.y) ||
       (isConstrictor && tries < maxTries && this._isFoodEnclosed(pos))
     );
@@ -1381,7 +1489,7 @@ class SnakeGame {
   _findAnyFreeTile() {
     for (let y = 0; y < this.ROWS; y++) {
       for (let x = 0; x < this.COLS; x++) {
-        if (!this.snake.some((s) => s.x === x && s.y === y) && !this.walls.isWallAt(x, y)) {
+        if (!this.snake.has(x, y) && !this.walls.isWallAt(x, y)) {
           return { x, y };
         }
       }
@@ -1400,9 +1508,8 @@ class SnakeGame {
    */
   _isFoodEnclosed(pos) {
     const key = (x, y) => `${x},${y}`;
-    const snakeSet = new Set(this.snake.map((s) => key(s.x, s.y)));
     const wallSet = this.walls.getWallSet();
-    const isBlocked = (x, y) => snakeSet.has(key(x, y)) || wallSet.has(key(x, y));
+    const isBlocked = (x, y) => this.snake.has(x, y) || wallSet.has(key(x, y));
     const wrap = this.boundary.enabled;
 
     const floodSize = (sx, sy, visited) => {
@@ -1636,8 +1743,8 @@ class SnakeGame {
       return `head${DIR_KEY[`${d.x},${d.y}`]}`;
     }
 
-    const prev = this.snake[i - 1];
-    const curr = this.snake[i];
+    const prev = this.snake.segmentAt(i - 1);
+    const curr = this.snake.segmentAt(i);
     const dirIn = this.boundary.dirBetween(prev, curr);
 
     if (i === this.snake.length - 1) {
@@ -1646,7 +1753,7 @@ class SnakeGame {
       return Math.abs(dirIn.x) >= Math.abs(dirIn.y) ? 'bodyHoriz' : 'bodyVert';
     }
 
-    const next = this.snake[i + 1];
+    const next = this.snake.segmentAt(i + 1);
     const dirOut = this.boundary.dirBetween(curr, next);
 
     const inCardinal = DIR_KEY[`${dirIn.x},${dirIn.y}`] !== undefined;
@@ -1679,7 +1786,7 @@ class SnakeGame {
    * @returns {Point} The resolved next head position.
    */
   _resolveNextHead() {
-    const nextHead = { x: this.snake[0].x + this.direction.x, y: this.snake[0].y + this.direction.y };
+    const nextHead = { x: this.snake.head().x + this.direction.x, y: this.snake.head().y + this.direction.y };
     this.boundary.wrap(nextHead);
     this.wormholes.tryTeleport(nextHead);
     return nextHead;
@@ -2000,7 +2107,7 @@ class SnakeGame {
    * @param {Point} dir
    */
   _handleInputWarning(dir) {
-    const newHead = this.boundary.wrap({ x: this.snake[0].x + dir.x, y: this.snake[0].y + dir.y });
+    const newHead = this.boundary.wrap({ x: this.snake.head().x + dir.x, y: this.snake.head().y + dir.y });
     const c = this.collision.getCollision(newHead);
     if (c.wall || c.boundary || c.self) return;
     this.timers.clear('warningTimeout');
@@ -2021,7 +2128,7 @@ class SnakeGame {
    * @param {Point} dir
    */
   _handleInputIgnored(dir) {
-    const newHead = this.boundary.wrap({ x: this.snake[0].x + dir.x, y: this.snake[0].y + dir.y });
+    const newHead = this.boundary.wrap({ x: this.snake.head().x + dir.x, y: this.snake.head().y + dir.y });
     const c = this.collision.getCollision(newHead);
     if (c.wall || c.boundary || c.self) return;
     this.input.clearBuffer();
