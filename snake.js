@@ -1,5 +1,5 @@
 /*
-Snake Demo - A Snake game with togglable features to demonstrate game design
+Snake Demo - A Snake game with togglable features to demonstrate game design. Renders on an HTML5 Canvas. Supports classic, time-trial, and constrictor modes with 12 togglable feature flags.
 Written in 2026 by Philipp Hagenlocher <me@philipphagenlocher.de>
 This software was written with the assistance of AI.
 
@@ -7,6 +7,29 @@ To the extent possible under law, the author(s) have dedicated all copyright and
 
 You should have received a copy of the CC0 Public Domain Dedication along with this software. If not, see <http://creativecommons.org/publicdomain/zero/1.0/>.
 */
+/**
+ * A 2D point on the grid.
+ * @typedef {{x: number, y: number}} Point
+ */
+
+/**
+ * A palette of colors for a snake segment.
+ * @typedef {{body: string, head: string, eye: string}} Palette
+ */
+
+/**
+ * A tile renderer callback.
+ * @callback TileRenderer
+ * @param {CanvasRenderingContext2D} ctx
+ * @param {Palette} palette
+ */
+
+/**
+ * A collision breakdown.
+ * @typedef {{wall: boolean, boundary: boolean, self: boolean}} CollisionResult
+ */
+
+/** @type {Point[]} 44 hand-crafted wall cells forming a hollow square ring. */
 const WALLS = [
   { x: 3, y: 3 },
   { x: 4, y: 3 },
@@ -54,10 +77,14 @@ const WALLS = [
   { x: 16, y: 15 },
 ];
 
+/** @type {string} Classic mode — no time limit, standard snake experience. */
 const MODE_CLASSIC = 'classic';
+/** @type {string} Time-trial mode — 2-minute countdown. */
 const MODE_TIME_TRIAL = 'timeTrial';
+/** @type {string} Constrictor mode — food eaten by enclosure. */
 const MODE_CONSTRICTOR = 'constrictor';
 
+/** @enum {string} Game state constants. */
 const STATE = Object.freeze({
   WAITING: 'waiting',
   PLAYING: 'playing',
@@ -66,6 +93,7 @@ const STATE = Object.freeze({
   OVER: 'over',
 });
 
+/** @type {Object<string, string[]>} Valid transitions for each state. */
 const STATE_TRANSITIONS = Object.freeze({
   [STATE.WAITING]: [STATE.PLAYING],
   [STATE.PLAYING]: [STATE.WARNING, STATE.IGNORED, STATE.OVER],
@@ -74,27 +102,54 @@ const STATE_TRANSITIONS = Object.freeze({
   [STATE.OVER]: [STATE.WAITING],
 });
 
+/** @const {string} Background color. */
 const COLOR_BG = '#0d1a0d';
+/** @const {string} Wall body color. */
 const COLOR_WALL_BODY = '#555';
+/** @const {string} Wall top/left edge highlight. */
 const COLOR_WALL_EDGE_LIGHT = '#777';
+/** @const {string} Wall bottom/right edge shadow. */
 const COLOR_WALL_EDGE_DARK = '#333';
+/** @const {string} Regular food color. */
 const COLOR_FOOD = '#7aff7a';
+/** @const {string} Bonus food (golden diamond) color. */
 const COLOR_FOOD_BONUS = '#ffd700';
+/** @const {string} Wormhole entry cell color. */
 const COLOR_WORMHOLE_ENTRY = '#003a00';
+/** @const {string} Wormhole exit cell color. */
 const COLOR_WORMHOLE_EXIT = '#e8e8e8';
+/** @const {number} Wormhole spawn interval in ms. */
 const WORMHOLE_SPAWN_INTERVAL_MS = 30000;
+/** @const {number} Wormhole lifetime in ms. */
 const WORMHOLE_LIFETIME_MS = 15000;
+/** @const {number} Minimum Manhattan distance between wormhole entry and exit. */
 const WORMHOLE_MIN_DISTANCE = 5;
+/** @const {number} Minimum free tiles required to spawn wormholes. */
 const WORMHOLE_MIN_FREE_TILES = 10;
+/** @const {string} Game-over overlay color. */
 const COLOR_OVERLAY = 'rgba(0, 0, 0, 0.7)';
+/** @const {string} Overlay text color. */
 const COLOR_OVERLAY_TEXT = '#fff';
-
+/** @const {number} Speed boost divisor factor (1.35 = ~35% faster). */
 const SPEED_BOOST_FACTOR = 1.35;
+/** @const {number} Warning/grace period timeout in ms. */
 const WARNING_TIMEOUT_MS = 700;
+/** @const {number} Bonus food lifetime before auto-removal in ms. */
 const BONUS_FOOD_LIFETIME_MS = 5000;
+/** @const {number} Bonus food spawn interval in ms (timed mode). */
 const BONUS_FOOD_SPAWN_INTERVAL_MS = 15000;
+/** @const {number} Score bonus decay interval in ms. */
 const SCORE_BONUS_DECAY_INTERVAL_MS = 200;
 
+/**
+ * Computes the grid direction from point a to point b.
+ * If wrap is enabled and the distance exceeds 1 cell (e.g. snake wraps around),
+ * the direction is flipped so it remains a cardinal direction.
+ * @param {Point} a Starting point.
+ * @param {Point} b Target point.
+ * @param {boolean} enableWrap Whether wrap-around boundaries are active.
+ * @returns {Point} Cardinal direction vector (dx, dy).
+ */
 function dirBetween(a, b, enableWrap) {
   const d = { x: b.x - a.x, y: b.y - a.y };
   if (enableWrap) {
@@ -104,6 +159,7 @@ function dirBetween(a, b, enableWrap) {
   return d;
 }
 
+/** @type {Object<string, string>} Maps direction offsets ("dx,dy") to cardinal names. */
 const DIR_KEY = {
   '0,-1': 'Up',
   '0,1': 'Down',
@@ -111,6 +167,7 @@ const DIR_KEY = {
   '1,0': 'Right',
 };
 
+/** @type {Object<string, string>} Maps incoming→outgoing direction pairs to corner tile keys. */
 const CORNER_MAP = {
   'Right->Down': 'cornerRD',
   'Up->Right': 'cornerLD',
@@ -122,11 +179,16 @@ const CORNER_MAP = {
   'Down->Left': 'cornerRU',
 };
 
+/** @type {Palette} Normal playing-state colors. */
 const PALETTE_NORMAL = { body: '#4a7a4a', head: '#8ad88a', eye: '#0d1a0d' };
+/** @type {Palette} Warning/grace-period colors (red tint). */
 const PALETTE_WARNING = { body: '#ff6666', head: '#ffaaaa', eye: '#4a0000' };
+/** @type {Palette} Constrictor self-collision ("ignored") colors (magenta tint). */
 const PALETTE_IGNORED = { body: '#c084fc', head: '#e2ccff', eye: '#4a0060' };
+/** @type {Palette} Speed-boost colors (goldenrod head only, body stays normal). */
 const PALETTE_BOOST = { body: '#4a7a4a', head: '#f0e68c', eye: '#0d1a0d' };
 
+/** @type {Object<string, TileRenderer>} Tile shape drawing functions keyed by shape name. */
 const TILE_RENDERERS = {
   headUp(ctx, p) {
     ctx.fillStyle = p.body;
@@ -246,11 +308,20 @@ const TILE_RENDERERS = {
   },
 };
 
+/**
+ * Manages named timers (intervals and timeouts) with clear-by-name semantics.
+ * @classdesc Prevents duplicate timers and provides bulk clear operations.
+ */
 class TimerManager {
   constructor() {
-    this._timers = {};
+    /** @private */ this._timers = {};
   }
 
+  /**
+   * Clears an existing timer of the given name if one exists.
+   * @private
+   * @param {string} name Timer name to clear.
+   */
   _clearExisting(name) {
     if (this._timers[name]) {
       const t = this._timers[name];
@@ -260,6 +331,13 @@ class TimerManager {
     }
   }
 
+  /**
+   * Registers a named interval. Clears any previous timer with the same name.
+   * @param {string} name Unique timer name.
+   * @param {Function} fn Callback to invoke on each interval tick.
+   * @param {number} ms Interval duration in milliseconds.
+   * @returns {number} The interval ID.
+   */
   setInterval(name, fn, ms) {
     this._clearExisting(name);
     const id = setInterval(fn, ms);
@@ -267,6 +345,13 @@ class TimerManager {
     return id;
   }
 
+  /**
+   * Registers a named timeout. Clears any previous timer with the same name.
+   * @param {string} name Unique timer name.
+   * @param {Function} fn Callback to invoke after the timeout.
+   * @param {number} ms Timeout duration in milliseconds.
+   * @returns {number} The timeout ID.
+   */
   setTimeout(name, fn, ms) {
     this._clearExisting(name);
     const id = setTimeout(fn, ms);
@@ -274,10 +359,15 @@ class TimerManager {
     return id;
   }
 
+  /**
+   * Clears the named timer if it exists.
+   * @param {string} name Timer name to clear.
+   */
   clear(name) {
     this._clearExisting(name);
   }
 
+  /** Clears all registered timers. */
   clearAll() {
     for (const name of Object.keys(this._timers)) {
       this.clear(name);
@@ -285,30 +375,52 @@ class TimerManager {
   }
 }
 
-// ─── WallsManager: enableWalls ──────────────────────────────────────────────
-
+/**
+ * Manages the static wall layout.
+ * @classdesc Handles wall rendering, collision checks, and wall-set queries.
+ */
 class WallsManager {
+  /**
+   * @param {SnakeGame} game The owning game instance.
+   */
   constructor(game) {
     this.game = game;
     this._wallSet = new Set(WALLS.map((w) => `${w.x},${w.y}`));
   }
 
+  /** @returns {boolean} Whether walls are enabled. */
   get enabled() {
     return this.game.options.enableWalls;
   }
 
+  /**
+   * Checks whether a grid cell contains a wall.
+   * @param {number} x Grid column.
+   * @param {number} y Grid row.
+   * @returns {boolean}
+   */
   isWallAt(x, y) {
     return this.enabled && this._wallSet.has(`${x},${y}`);
   }
 
+  /**
+   * Returns the set of wall cell keys (or empty set if disabled).
+   * @returns {Set<string>}
+   */
   getWallSet() {
     return this.enabled ? this._wallSet : new Set();
   }
 
+  /** @returns {number} Number of wall cells (44). */
   get count() {
     return WALLS.length;
   }
 
+  /**
+   * Draws all walls onto the canvas with a 3D beveled appearance.
+   * @param {CanvasRenderingContext2D} ctx
+   * @param {number} cellSize Pixel size of each grid cell.
+   */
   draw(ctx, cellSize) {
     if (!this.enabled) return;
     WALLS.forEach((w) => {
@@ -324,17 +436,29 @@ class WallsManager {
   }
 }
 
-// ─── BoundaryManager: enableWrap ────────────────────────────────────────────
-
+/**
+ * Manages boundary behavior (wrap vs. solid walls).
+ * @classdesc Handles coordinate wrapping, bounds checking, and wrap-aware
+ * direction computation.
+ */
 class BoundaryManager {
+  /**
+   * @param {SnakeGame} game The owning game instance.
+   */
   constructor(game) {
     this.game = game;
   }
 
+  /** @returns {boolean} Whether wrap-around boundaries are enabled. */
   get enabled() {
     return this.game.options.enableWrap;
   }
 
+  /**
+   * Wraps a position around the grid when wrap mode is enabled.
+   * @param {Point} pos Grid position to wrap.
+   * @returns {Point} The (possibly wrapped) position.
+   */
   wrap(pos) {
     if (!this.enabled) return pos;
     pos.x = (pos.x + this.game.COLS) % this.game.COLS;
@@ -342,28 +466,54 @@ class BoundaryManager {
     return pos;
   }
 
+  /**
+   * Checks whether a cell is within the grid boundaries.
+   * @param {number} x Grid column.
+   * @param {number} y Grid row.
+   * @returns {boolean}
+   */
   isInBounds(x, y) {
     return x >= 0 && x < this.game.COLS && y >= 0 && y < this.game.ROWS;
   }
 
+  /**
+   * Computes the wrap-aware direction between two grid positions.
+   * @param {Point} a Starting point.
+   * @param {Point} b Target point.
+   * @returns {Point} Cardinal direction vector.
+   */
   dirBetween(a, b) {
     return dirBetween(a, b, this.enabled);
   }
 }
 
-// ─── WormholesManager: enableWormholes ──────────────────────────────────────
-
+/**
+ * Manages wormhole entry/exit teleport pairs.
+ * @classdesc Handles wormhole spawning, lifetime timers, teleportation, and
+ * rendering. Entry cells are dark green, exit cells are off-white.
+ */
 class WormholesManager {
+  /**
+   * @param {SnakeGame} game The owning game instance.
+   */
   constructor(game) {
     this.game = game;
+    /** @type {Point|null} Wormhole entry cell. */
     this.entry = null;
+    /** @type {Point|null} Wormhole exit cell. */
     this.exit = null;
   }
 
+  /** @returns {boolean} Whether wormholes are enabled. */
   get enabled() {
     return this.game.options.enableWormholes;
   }
 
+  /**
+   * Attempts to spawn a wormhole pair at random valid positions.
+   * Entry and exit are placed at least WORMHOLE_MIN_DISTANCE apart (Manhattan).
+   * Won't spawn if fewer than WORMHOLE_MIN_FREE_TILES free tiles remain.
+   */
   trySpawn() {
     if (!this.enabled) return;
     if (this.game.freeTiles - this.game.snake.length <= WORMHOLE_MIN_FREE_TILES) return;
@@ -399,6 +549,12 @@ class WormholesManager {
     );
   }
 
+  /**
+   * If the head is on the wormhole entry, teleports it to the exit and
+   * consumes both wormholes.
+   * @param {Point} head The snake's head position.
+   * @returns {boolean} Whether a teleport occurred.
+   */
   tryTeleport(head) {
     if (!this.enabled || !this.entry) return false;
     if (head.x === this.entry.x && head.y === this.entry.y) {
@@ -413,6 +569,11 @@ class WormholesManager {
     return false;
   }
 
+  /**
+   * Draws the wormhole entry (dark green) and exit (off-white) cells.
+   * @param {CanvasRenderingContext2D} ctx
+   * @param {number} cellSize Pixel size of each grid cell.
+   */
   draw(ctx, cellSize) {
     if (!this.enabled || !this.entry) return;
     ctx.fillStyle = COLOR_WORMHOLE_ENTRY;
@@ -421,6 +582,7 @@ class WormholesManager {
     ctx.fillRect(this.exit.x * cellSize + 1, this.exit.y * cellSize + 1, cellSize - 2, cellSize - 2);
   }
 
+  /** Starts the periodic wormhole spawn interval (every 30s). */
   startTimers() {
     if (!this.enabled) return;
     this.game.timers.setInterval(
@@ -436,31 +598,53 @@ class WormholesManager {
   }
 }
 
-// ─── BonusFoodManager: enableBonusFood + enableTimedBonusFood + enableShrinkOnBonusFood ──
-
+/**
+ * Manages bonus food spawning, movement, collision, eating, and rendering.
+ * @classdesc Handles the golden diamond bonus food that appears on a timer,
+ * moves randomly, and can be eaten by the snake head (classic/time-trial) or
+ * by enclosure (constrictor).
+ */
 class BonusFoodManager {
+  /**
+   * @param {SnakeGame} game The owning game instance.
+   */
   constructor(game) {
     this.game = game;
+    /** @type {Point|null} Current bonus food position. */
     this.pos = null;
   }
 
+  /** @returns {boolean} Whether bonus food is enabled. */
   get enabled() {
     return this.game.options.enableBonusFood;
   }
+  /** @returns {boolean} Whether timed spawn (every 15s) is enabled. */
   get timed() {
     return this.game.options.enableTimedBonusFood;
   }
+  /** @returns {boolean} Whether eating bonus food shrinks the snake. */
   get canShrink() {
     return this.game.options.enableShrinkOnBonusFood;
   }
+  /** @returns {boolean} Whether bonus food is currently on the board. */
   get active() {
     return this.pos !== null;
   }
 
+  /**
+   * Checks whether a cell matches the bonus food position.
+   * @param {number} x Grid column.
+   * @param {number} y Grid row.
+   * @returns {boolean}
+   */
   isAt(x, y) {
     return this.pos !== null && this.pos.x === x && this.pos.y === y;
   }
 
+  /**
+   * Places bonus food at a random valid position and starts its movement and
+   * lifetime timers.
+   */
   place() {
     if (!this.enabled) return;
     let pos;
@@ -483,6 +667,12 @@ class BonusFoodManager {
     );
   }
 
+  /**
+   * Moves bonus food one step in a random cardinal direction.
+   * Respects wrap boundaries and wall obstacles.
+   * In constrictor mode, checks if the new position is enclosed and eats it.
+   * @private
+   */
   _move() {
     if (!this.pos) return;
     const dirs = [
@@ -510,14 +700,28 @@ class BonusFoodManager {
     }
   }
 
+  /**
+   * Checks whether the snake head is on the bonus food.
+   * @param {Point} head The snake's head position.
+   * @returns {boolean}
+   */
   isHeadCollision(head) {
     return this.enabled && this.active && head.x === this.pos.x && head.y === this.pos.y;
   }
 
+  /**
+   * Checks whether the bonus food is enclosed by the snake.
+   * @returns {boolean}
+   */
   isEnclosed() {
     return this.enabled && this.active && this.game._isFoodEnclosed(this.pos);
   }
 
+  /**
+   * Handles bonus food consumption. Shrinks the snake if enabled, clears bonus
+   * food timers, and removes the bonus food from the board.
+   * @returns {number} Points awarded (100).
+   */
   onEat() {
     if (this.canShrink) {
       const shrunkLen = Math.ceil(this.game.snake.length / 2);
@@ -531,6 +735,11 @@ class BonusFoodManager {
     return 100;
   }
 
+  /**
+   * Draws the bonus food as a golden diamond shape.
+   * @param {CanvasRenderingContext2D} ctx
+   * @param {number} cellSize Pixel size of each grid cell.
+   */
   draw(ctx, cellSize) {
     if (!this.enabled || !this.pos) return;
     const cx = this.pos.x * cellSize + cellSize / 2;
@@ -546,6 +755,10 @@ class BonusFoodManager {
     ctx.fill();
   }
 
+  /**
+   * Spawns bonus food on every 5th food eaten (non-timed mode).
+   * @param {number} foodsEaten Total regular foods eaten.
+   */
   trySpawnOnCount(foodsEaten) {
     if (!this.enabled || this.timed) return;
     if (foodsEaten % 5 === 0 && !this.active) {
@@ -553,6 +766,7 @@ class BonusFoodManager {
     }
   }
 
+  /** Starts the timed bonus-food spawn interval (every 15s). */
   startTimers() {
     if (!this.enabled || !this.timed) return;
     this.game.timers.setInterval(
@@ -564,6 +778,7 @@ class BonusFoodManager {
     );
   }
 
+  /** Resumes movement and lifetime timers for an active bonus food after unpause. */
   resumeMovementTimers() {
     if (!this.enabled || !this.active) return;
     this.game.timers.setInterval('bonusFoodInterval', () => this._move(), this.game.currentSpeed + 60);
@@ -577,37 +792,58 @@ class BonusFoodManager {
     );
   }
 
+  /** Clears only the bonus food movement interval. */
   clearMovementInterval() {
     this.game.timers.clear('bonusFoodInterval');
   }
 
+  /** Clears both the bonus food movement interval and lifetime timeout. */
   clearMovementTimers() {
     this.game.timers.clear('bonusFoodInterval');
     this.game.timers.clear('bonusFoodTimeout');
   }
 
+  /** Clears all bonus-food-related timers (spawn + movement + lifetime). */
   clearAllTimers() {
     this.game.timers.clear('bonusFoodTimer');
     this.clearMovementTimers();
   }
 }
 
-// ─── ScoreBonusManager: enableScoreBonus ────────────────────────────────────
-
+/**
+ * Manages the decaying bonus score multiplier displayed as "Bonus: N" in the HUD.
+ * @classdesc Starts at 100, decays by 1 every 200ms to 0. Resets to 100
+ * after each regular food is eaten. The current bonus value is added to the
+ * score when food is eaten.
+ */
 class ScoreBonusManager {
+  /**
+   * @param {SnakeGame} game The owning game instance.
+   */
   constructor(game) {
     this.game = game;
+    /** @type {number} Current bonus value (0-100). */
     this.value = 100;
   }
 
+  /** @returns {boolean} Whether the score bonus feature is enabled. */
   get enabled() {
     return this.game.options.enableScoreBonus;
   }
 
+  /**
+   * Generates the HUD HTML fragment for the bonus display.
+   * @returns {string} HTML string, empty if disabled.
+   */
   getHUDHtml() {
     return this.enabled ? '<span class="snake-bonus">Bonus: 0</span>' : '';
   }
 
+  /**
+   * Called when regular food is eaten. Applies the current bonus to the score,
+   * resets the bonus value, and restarts the decay timer.
+   * @returns {number} Bonus points to add.
+   */
   onFoodEaten() {
     if (!this.enabled) return 0;
     const bonus = this.value > 0 ? this.value : 0;
@@ -619,6 +855,7 @@ class ScoreBonusManager {
     return bonus;
   }
 
+  /** Starts the bonus decay interval (decrements by 1 every 200ms). */
   startDecay() {
     if (!this.enabled) return;
     this.game.timers.setInterval(
@@ -632,26 +869,39 @@ class ScoreBonusManager {
     );
   }
 
+  /** Clears the score bonus decay interval. */
   clearTimers() {
     this.game.timers.clear('scoreBonusInterval');
   }
 
+  /** Restarts the decay interval after unpause, if the bonus value is still > 0. */
   resumeDecay() {
     if (this.enabled && this.value > 0) this.startDecay();
   }
 }
 
-// ─── SpeedManager: enableSpeedUp ────────────────────────────────────────────
-
+/**
+ * Manages game-speed acceleration when food is eaten.
+ * @classdesc Each regular food eaten reduces the tick interval by a minor
+ * amount, making the snake move faster. Does nothing when enableSpeedUp is off.
+ */
 class SpeedManager {
+  /**
+   * @param {SnakeGame} game The owning game instance.
+   */
   constructor(game) {
     this.game = game;
   }
 
+  /** @returns {boolean} Whether speed-up is enabled. */
   get enabled() {
     return this.game.options.enableSpeedUp;
   }
 
+  /**
+   * Called after eating regular food. Recalculates `currentSpeed` and
+   * restarts the game loop with the new interval.
+   */
   onFoodEaten() {
     if (!this.enabled) return;
     const baseTickRate = 1000 / this.game.BASE_SPEED;
@@ -660,31 +910,47 @@ class SpeedManager {
     this.restartGameLoop();
   }
 
+  /** Clears the current game loop and schedules the next tick. */
   restartGameLoop() {
     this.game.timers.clear('gameLoop');
     this.game._scheduleNextTick();
   }
 }
 
-// ─── InputManager: enableInputBuffer + enableInstantMovement + enableSpeedBoost ──
-
+/**
+ * Manages direction input buffering, speed boost, and instant movement.
+ * @classdesc Provides input queueing (up to 2 buffered directions), same-key
+ * speed boost activation, and instant-move-on-keypress behavior.
+ */
 class InputManager {
+  /**
+   * @param {SnakeGame} game The owning game instance.
+   */
   constructor(game) {
     this.game = game;
+    /** @type {Point[]} Buffered direction inputs (max 2). */
     this.buffer = [];
+    /** @type {boolean} Whether speed boost is currently active. */
     this.speedBoostActive = false;
   }
 
+  /** @returns {boolean} Whether input buffering is enabled. */
   get enableBuffer() {
     return this.game.options.enableInputBuffer;
   }
+  /** @returns {boolean} Whether speed boost is enabled. */
   get enableBoost() {
     return this.game.options.enableSpeedBoost;
   }
+  /** @returns {boolean} Whether instant movement is enabled. */
   get enableInstant() {
     return this.game.options.enableInstantMovement;
   }
 
+  /**
+   * Commits the oldest valid buffered direction as the current direction.
+   * Skips opposite and duplicate directions. Deactivates boost on direction change.
+   */
   commitDirection() {
     if (this.enableBuffer) {
       const prevDir = { x: this.game.direction.x, y: this.game.direction.y };
@@ -721,6 +987,13 @@ class InputManager {
     }
   }
 
+  /**
+   * Handles a direction input while in the PLAYING state.
+   * Buffers the input, activates/deactivates speed boost, and triggers
+   * instant movement if enabled.
+   * @param {Point} dir The direction from the arrow key.
+   * @returns {boolean} Whether the input was accepted (led to a move or boost).
+   */
   handlePlayingInput(dir) {
     if (this.enableBuffer) {
       const ref = this.buffer.length > 0 ? this.buffer[this.buffer.length - 1] : this.game.direction;
@@ -754,36 +1027,58 @@ class InputManager {
     return accepted;
   }
 
+  /**
+   * Activates the speed boost state.
+   * @private
+   */
   _activateBoost() {
     if (!this.enableBoost || this.speedBoostActive) return;
     this.speedBoostActive = true;
   }
 
+  /**
+   * Deactivates the speed boost state.
+   * @private
+   */
   _deactivateBoost() {
     if (!this.speedBoostActive) return;
     this.speedBoostActive = false;
   }
 
+  /** Resets the speed boost to inactive. */
   resetBoost() {
     this.speedBoostActive = false;
   }
 
+  /** Empties the input buffer. */
   clearBuffer() {
     this.buffer = [];
   }
 }
 
-// ─── CollisionResolver: enableGracePeriod + collision detection ─────────────
-
+/**
+ * Detects and resolves collisions.
+ * @classdesc Checks wall, boundary, and self-collisions and routes them
+ * through the grace period, constrictor ignored state, or game over logic.
+ */
 class CollisionResolver {
+  /**
+   * @param {SnakeGame} game The owning game instance.
+   */
   constructor(game) {
     this.game = game;
   }
 
+  /** @returns {boolean} Whether the grace period is enabled. */
   get graceEnabled() {
     return this.game.options.enableGracePeriod;
   }
 
+  /**
+   * Checks all collision types at a position.
+   * @param {Point} pos The position to check.
+   * @returns {CollisionResult}
+   */
   getCollision(pos) {
     return {
       wall: this.game.walls.isWallAt(pos.x, pos.y),
@@ -792,6 +1087,10 @@ class CollisionResolver {
     };
   }
 
+  /**
+   * Checks whether the snake has any safe move from its current head position.
+   * @returns {boolean}
+   */
   hasAnySafeMove() {
     const dirs = [
       { x: 0, y: -1 },
@@ -809,12 +1108,23 @@ class CollisionResolver {
     return false;
   }
 
+  /**
+   * Checks whether moving in a given direction from the head is safe.
+   * @param {Point} dir Direction vector.
+   * @returns {boolean} True if no wall, boundary, or self collision.
+   */
   isDirSafe(dir) {
     const pos = this.game.boundary.wrap({ x: this.game.snake[0].x + dir.x, y: this.game.snake[0].y + dir.y });
     const c = this.getCollision(pos);
     return !c.wall && !c.boundary && !c.self;
   }
 
+  /**
+   * Resolves collision for the next head position. Routes to warning (grace
+   * period), ignored (constrictor self-collision), or immediate game over.
+   * @param {Point} nextHead The next head position to check.
+   * @returns {boolean} True if a collision was detected and handled.
+   */
   resolve(nextHead) {
     const { wall, boundary, self } = this.getCollision(nextHead);
     if (wall || boundary || self) {
@@ -837,14 +1147,41 @@ class CollisionResolver {
   }
 }
 
-// ═══════════════════════════════════════════════════════════════════════════════
-// SnakeGame
-// ═══════════════════════════════════════════════════════════════════════════════
-
+/**
+ * Core Snake game engine.
+ * @classdesc Manages the game canvas, snake state, food placement, input
+ * handling, collision resolution, tile rendering, and all game lifecycle.
+ * Uses delegated managers for walls, boundaries, wormholes, bonus food,
+ * score bonus, speed, input, and collision.
+ *
+ * @example
+ * const game = new SnakeGame(document.getElementById('game'), {
+ *   mode: 'classic',
+ *   enableWrap: true,
+ * });
+ */
 // eslint-disable-next-line no-unused-vars -- accessed from index.html
 class SnakeGame {
+  /**
+   * @param {HTMLElement} container The DOM element to mount the game into.
+   * @param {Object} [options={}] Feature toggles and mode selector.
+   * @param {string} [options.mode='classic'] Game mode: 'classic', 'timeTrial', or 'constrictor'.
+   * @param {boolean} [options.enableBonusFood=true] Enable golden diamond bonus food.
+   * @param {boolean} [options.enableGracePeriod=true] Enable 1-second warning before collision.
+   * @param {boolean} [options.enableShrinkOnBonusFood=true] Halve snake length on bonus food.
+   * @param {boolean} [options.enableSpeedUp=true] Accelerate after each food eaten.
+   * @param {boolean} [options.enableScoreBonus=true] Enable decaying bonus score multiplier.
+   * @param {boolean} [options.enableWrap=true] Enable wrap-around boundaries.
+   * @param {boolean} [options.enableSpeedBoost=true] Same-direction keypress boosts speed.
+   * @param {boolean} [options.enableInputBuffer=true] Buffer up to 2 rapid inputs.
+   * @param {boolean} [options.enableInstantMovement=true] Move immediately on keypress.
+   * @param {boolean} [options.enableTimedBonusFood=true] Spawn bonus food every 15s.
+   * @param {boolean} [options.enableWalls=true] Enable wall ring inside arena.
+   * @param {boolean} [options.enableWormholes=true] Enable wormhole teleport pairs.
+   */
   constructor(container, options = {}) {
     this.container = container;
+    /** @type {Object} Resolved options with defaults applied. */
     this.options = {
       mode: options.mode || MODE_CLASSIC,
       enableBonusFood: options.enableBonusFood !== undefined ? options.enableBonusFood : true,
@@ -861,20 +1198,34 @@ class SnakeGame {
       enableWormholes: options.enableWormholes !== undefined ? options.enableWormholes : true,
     };
 
+    /** @type {number} Number of grid columns. */
     this.COLS = 20;
+    /** @type {number} Number of grid rows. */
     this.ROWS = 20;
+    /** @type {number} Base game loop interval in ms. */
     this.BASE_SPEED = 135;
+    /** @type {number} Minimum game loop interval in ms (fastest speed). */
     this.MIN_SPEED = 50;
+    /** @type {number} Rate step used for speed-up calculation. */
     this.RATE_STEP = 0.2;
+    /** @type {number} Time-trial countdown duration in ms (2 minutes). */
     this.TIME_LIMIT = 120000;
 
+    /** @type {WallsManager} */
     this.walls = new WallsManager(this);
+    /** @type {BoundaryManager} */
     this.boundary = new BoundaryManager(this);
+    /** @type {WormholesManager} */
     this.wormholes = new WormholesManager(this);
+    /** @type {BonusFoodManager} */
     this.bonusFood = new BonusFoodManager(this);
+    /** @type {ScoreBonusManager} */
     this.scoreBonus = new ScoreBonusManager(this);
+    /** @type {InputManager} */
     this.input = new InputManager(this);
+    /** @type {SpeedManager} */
     this.speed = new SpeedManager(this);
+    /** @type {CollisionResolver} */
     this.collision = new CollisionResolver(this);
 
     this._buildDOM();
@@ -882,6 +1233,11 @@ class SnakeGame {
     this.init();
   }
 
+  /**
+   * Builds the DOM structure inside the container element.
+   * Creates HUD (score, bonus, timer), canvas wrapper, and message elements.
+   * @private
+   */
   _buildDOM() {
     this.container.innerHTML = `
       <div class="snake-container">
@@ -906,6 +1262,10 @@ class SnakeGame {
     this._createTiles();
   }
 
+  /**
+   * Binds canvas keydown, focus, and blur event listeners.
+   * @private
+   */
   _bindEvents() {
     this._onKeydown = this._handleKeydown.bind(this);
     this._onFocus = () => {
@@ -924,6 +1284,9 @@ class SnakeGame {
     this.overlay.addEventListener('click', this._onClick);
   }
 
+  /**
+   * Removes event listeners and clears all timers. Call before re-mounting.
+   */
   destroy() {
     this.canvas.removeEventListener('keydown', this._onKeydown);
     this.canvas.removeEventListener('focus', this._onFocus);
@@ -932,14 +1295,23 @@ class SnakeGame {
     this._clearAllTimers();
   }
 
+  /** @private */
   _clearAllTimers() {
     this.timers.clearAll();
   }
 
+  /**
+   * Initializes or resets all game state to a fresh "waiting" state.
+   * Resets snake position, score, timers, food, and redraws the canvas.
+   */
   init() {
+    /** @type {Point[]} Snake body segments (head is index 0). */
     this.snake = [{ x: 10, y: 10 }];
+    /** @type {Point} Current movement direction. */
     this.direction = { x: 0, y: 0 };
+    /** @type {Point} Next direction to apply (non-buffered mode). */
     this.nextDirection = { x: 0, y: 0 };
+    /** @type {number} Current score. */
     this.score = 0;
     this.elapsed = 0;
     this._transitionTo(STATE.WAITING);
@@ -971,6 +1343,11 @@ class SnakeGame {
     this._draw();
   }
 
+  /**
+   * Places regular food at a random valid position (not on snake, wall, or
+   * enclosed region in constrictor mode).
+   * @private
+   */
   _placeFood() {
     const isConstrictor = this.options.mode === MODE_CONSTRICTOR;
     let pos;
@@ -990,9 +1367,15 @@ class SnakeGame {
         pos = fallback;
       }
     }
+    /** @type {Point} Regular food position. */
     this.food = pos;
   }
 
+  /**
+   * Finds the first grid cell that is not occupied by snake or walls.
+   * @private
+   * @returns {Point|null} A free cell, or null if the board is full.
+   */
   _findAnyFreeTile() {
     for (let y = 0; y < this.ROWS; y++) {
       for (let x = 0; x < this.COLS; x++) {
@@ -1004,6 +1387,15 @@ class SnakeGame {
     return null;
   }
 
+  /**
+   * Determines whether a grid position is enclosed by the snake using BFS
+   * flood fill. In non-wrap mode, a region is enclosed if it cannot reach the
+   * grid boundary. In wrap mode, the food's connected component is compared
+   * against the largest other connected component.
+   * @private
+   * @param {Point} pos The position to check.
+   * @returns {boolean} True if the position is enclosed.
+   */
   _isFoodEnclosed(pos) {
     const key = (x, y) => `${x},${y}`;
     const snakeSet = new Set(this.snake.map((s) => key(s.x, s.y)));
@@ -1072,6 +1464,11 @@ class SnakeGame {
     return foodSize < largestOther;
   }
 
+  /**
+   * Consumes the regular food: awards 10 pts + score bonus, increments
+   * foodsEaten, sets growth, triggers board-full check, and places new food.
+   * @private
+   */
   _eatRegularFood() {
     const points = 10 + this.scoreBonus.onFoodEaten();
     this.score += points;
@@ -1087,11 +1484,20 @@ class SnakeGame {
     this.speed.onFoodEaten();
   }
 
+  /**
+   * Consumes the bonus food. Awards points, handles shrink, and clears
+   * the bonus food from the board.
+   * @private
+   */
   _eatBonusFood() {
     this.score += this.bonusFood.onEat();
     this.scoreElement.textContent = `Score: ${this.score}`;
   }
 
+  /**
+   * Updates the HUD timer display. In time-trial mode, checks for time expiry.
+   * @private
+   */
   _updateTimerDisplay() {
     this.elapsed = Date.now() - this.startTime;
     if (this.options.mode === MODE_TIME_TRIAL) {
@@ -1107,6 +1513,11 @@ class SnakeGame {
     }
   }
 
+  /**
+   * Renders the full frame: background, walls, wormholes, snake (via
+   * pre-rendered tiles), food, bonus food, and game-over overlay.
+   * @private
+   */
   _draw() {
     this.ctx.fillStyle = COLOR_BG;
     this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
@@ -1155,6 +1566,11 @@ class SnakeGame {
     }
   }
 
+  /**
+   * Creates all pre-rendered off-screen canvas tiles (46 total: 3 full
+   * palette sets × 14 shapes + 4 boost head tiles).
+   * @private
+   */
   _createTiles() {
     const sets = [
       { palette: PALETTE_NORMAL, suffix: '' },
@@ -1174,6 +1590,13 @@ class SnakeGame {
     }
   }
 
+  /**
+   * Creates a set of tiles for a given palette and suffix.
+   * @private
+   * @param {Palette} palette The palette to render with.
+   * @param {string} suffix Key suffix (e.g. '', '_w', '_i').
+   * @returns {Object<string, HTMLCanvasElement>}
+   */
   _createTileSet(palette, suffix) {
     const set = {};
     for (const key of Object.keys(TILE_RENDERERS)) {
@@ -1182,6 +1605,13 @@ class SnakeGame {
     return set;
   }
 
+  /**
+   * Creates a single off-screen canvas tile and draws the given renderer on it.
+   * @private
+   * @param {string} key Tile shape key (e.g. 'headUp', 'bodyHoriz').
+   * @param {Palette} palette The palette to render with.
+   * @returns {HTMLCanvasElement}
+   */
   _makeTile(key, palette) {
     const canvas = document.createElement('canvas');
     canvas.width = this.CELL_SIZE + 1;
@@ -1191,6 +1621,13 @@ class SnakeGame {
     return canvas;
   }
 
+  /**
+   * Determines which tile shape key to use for the segment at index i.
+   * Returns keys like 'headUp', 'bodyHoriz', 'tailDown', 'cornerRD', etc.
+   * @private
+   * @param {number} i Segment index in the snake array.
+   * @returns {string} Tile key (without palette suffix).
+   */
   _getSegmentTileKey(i) {
     if (i === 0) {
       const d = this.direction.x === 0 && this.direction.y === 0 ? { x: 1, y: 0 } : this.direction;
@@ -1226,10 +1663,19 @@ class SnakeGame {
     return CORNER_MAP[`${inName}->${outName}`];
   }
 
+  /**
+   * Commits the next buffered direction as the current direction.
+   * @private
+   */
   _processInput() {
     this.input.commitDirection();
   }
 
+  /**
+   * Calculates the next head position, applies wrapping, and checks wormholes.
+   * @private
+   * @returns {Point} The resolved next head position.
+   */
   _resolveNextHead() {
     const nextHead = { x: this.snake[0].x + this.direction.x, y: this.snake[0].y + this.direction.y };
     this.boundary.wrap(nextHead);
@@ -1237,10 +1683,22 @@ class SnakeGame {
     return nextHead;
   }
 
+  /**
+   * Resolves collision for the next head position.
+   * @private
+   * @param {Point} nextHead
+   * @returns {boolean} True if a collision occurred (state was changed).
+   */
   _processCollision(nextHead) {
     return this.collision.resolve(nextHead);
   }
 
+  /**
+   * Processes a single turn in constrictor mode: handles head-food poofing,
+   * auto-growth, growth, enclosure-based eating of regular and bonus food.
+   * @private
+   * @param {Point} head The current head position.
+   */
   _processConstrictorTurn(head) {
     if (head.x === this.food.x && head.y === this.food.y) {
       if (this.snake.length >= this.freeTiles) {
@@ -1268,6 +1726,12 @@ class SnakeGame {
     }
   }
 
+  /**
+   * Processes a single turn in classic/time-trial modes: handles regular food
+   * eating, growth, tail popping, and bonus food head collision.
+   * @private
+   * @param {Point} head The current head position.
+   */
   _processClassicTurn(head) {
     if (head.x === this.food.x && head.y === this.food.y) {
       this._eatRegularFood();
@@ -1285,6 +1749,11 @@ class SnakeGame {
     }
   }
 
+  /**
+   * Main game tick: processes input, resolves head position, checks collision,
+   * advances the snake, handles mode-specific turn logic, and redraws.
+   * @private
+   */
   _update() {
     this._processInput();
     const nextHead = this._resolveNextHead();
@@ -1301,6 +1770,11 @@ class SnakeGame {
     this._draw();
   }
 
+  /**
+   * Schedules the next game tick via a recursive setTimeout.
+   * Adjusts the delay for speed boost if active.
+   * @private
+   */
   _scheduleNextTick() {
     const delay = this.input.speedBoostActive ? this.currentSpeed / SPEED_BOOST_FACTOR : this.currentSpeed;
     this.timers.setTimeout(
@@ -1315,6 +1789,12 @@ class SnakeGame {
     );
   }
 
+  /**
+   * Transitions to a new game state. Logs a warning if the transition is
+   * not in STATE_TRANSITIONS, but always applies the new state.
+   * @private
+   * @param {string} newState One of the STATE constants.
+   */
   _transitionTo(newState) {
     if (this.state === newState) return;
     const valid = STATE_TRANSITIONS[this.state];
@@ -1324,6 +1804,12 @@ class SnakeGame {
     this.state = newState;
   }
 
+  /**
+   * Enters the warning (grace period) state. Clears the game loop, stores
+   * the offending direction, and starts a 700ms countdown (shorter if
+   * speed boost is active).
+   * @private
+   */
   _enterWarning() {
     this.timers.clear('gameLoop');
     this.bonusFood.clearMovementInterval();
@@ -1340,6 +1826,12 @@ class SnakeGame {
     );
   }
 
+  /**
+   * Enters the ignored state (constrictor self-collision). Clears the game
+   * loop and all bonus-food timers, displays a prompt, and waits for a
+   * safe direction input.
+   * @private
+   */
   _enterIgnored() {
     this.timers.clear('gameLoop');
     this.bonusFood.clearAllTimers();
@@ -1351,6 +1843,12 @@ class SnakeGame {
     this._draw();
   }
 
+  /**
+   * Starts the game from the WAITING state. Transitions to PLAYING, records
+   * the start time, starts the game loop and all periodic timers.
+   * In constrictor mode, sets auto-growth (14 ticks).
+   * @private
+   */
   _startGame() {
     this.canvas.focus();
     this._transitionTo(STATE.PLAYING);
@@ -1366,6 +1864,11 @@ class SnakeGame {
     this.wormholes.startTimers();
   }
 
+  /**
+   * Ends the game: clears all timers, transitions to OVER, shows the
+   * game-over overlay, and displays "Press Space to restart".
+   * @private
+   */
   _gameOver() {
     this._clearAllTimers();
     this._transitionTo(STATE.OVER);
@@ -1373,6 +1876,11 @@ class SnakeGame {
     this._draw();
   }
 
+  /**
+   * Pauses the game on canvas blur. Clears all timers and stores the
+   * remaining warning elapsed time if in the WARNING state.
+   * @private
+   */
   _pauseGame() {
     if (this.state !== STATE.PLAYING && this.state !== STATE.WARNING && this.state !== STATE.IGNORED) return;
     this.wasPaused = true;
@@ -1383,6 +1891,11 @@ class SnakeGame {
     this.overlay.textContent = 'Paused \u2014 Click to resume';
   }
 
+  /**
+   * Resumes the game after pause (canvas focus). Restores timers for the
+   * current state (PLAYING, WARNING, or IGNORED).
+   * @private
+   */
   _resumeGame() {
     if (!this.wasPaused) return;
     this.wasPaused = false;
@@ -1411,11 +1924,21 @@ class SnakeGame {
     this.overlay.textContent = 'Click to focus';
   }
 
+  /**
+   * Resumes bonus food movement and score bonus decay timers (shared across
+   * several resume paths).
+   * @private
+   */
   _resumeCommonTimers() {
     this.bonusFood.resumeMovementTimers();
     this.scoreBonus.resumeDecay();
   }
 
+  /**
+   * Handles keyboard input. Routes to state-specific handlers.
+   * @private
+   * @param {KeyboardEvent} e
+   */
   _handleKeydown(e) {
     if (this.state === STATE.OVER && e.code === 'Space') {
       this.init();
@@ -1454,12 +1977,23 @@ class SnakeGame {
     }
   }
 
+  /**
+   * Handles input in WAITING state: sets direction and starts the game.
+   * @private
+   * @param {Point} dir
+   */
   _handleInputWaiting(dir) {
     this.nextDirection = dir;
     this.direction = dir;
     this._startGame();
   }
 
+  /**
+   * Handles input in WARNING state: checks if the direction avoids collision,
+   * and if so, escapes the warning and resumes play.
+   * @private
+   * @param {Point} dir
+   */
   _handleInputWarning(dir) {
     const newHead = this.boundary.wrap({ x: this.snake[0].x + dir.x, y: this.snake[0].y + dir.y });
     const c = this.collision.getCollision(newHead);
@@ -1475,6 +2009,12 @@ class SnakeGame {
     this.bonusFood.resumeMovementTimers();
   }
 
+  /**
+   * Handles input in IGNORED state: checks if the direction avoids collision,
+   * and if so, escapes the ignored state and resumes play.
+   * @private
+   * @param {Point} dir
+   */
   _handleInputIgnored(dir) {
     const newHead = this.boundary.wrap({ x: this.snake[0].x + dir.x, y: this.snake[0].y + dir.y });
     const c = this.collision.getCollision(newHead);
@@ -1488,6 +2028,11 @@ class SnakeGame {
     this._resumeCommonTimers();
   }
 
+  /**
+   * Handles input in PLAYING state via the InputManager.
+   * @private
+   * @param {Point} dir
+   */
   _handleInputPlaying(dir) {
     this.input.handlePlayingInput(dir);
   }
