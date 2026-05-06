@@ -490,16 +490,17 @@ class SnakeBody {
  */
 class WallsManager {
   /**
-   * @param {SnakeGame} game The owning game instance.
+   * @param {{ enabled: boolean }} deps
+   * @param {boolean} deps.enabled Whether walls are enabled.
    */
-  constructor(game) {
-    this.game = game;
+  constructor({ enabled }) {
+    this._enabled = enabled;
     this._wallSet = new Set(WALLS.map((w) => `${w.x},${w.y}`));
   }
 
   /** @returns {boolean} Whether walls are enabled. */
   get enabled() {
-    return this.game.options.enableWalls;
+    return this._enabled;
   }
 
   /**
@@ -552,15 +553,17 @@ class WallsManager {
  */
 class BoundaryManager {
   /**
-   * @param {SnakeGame} game The owning game instance.
+   * @param {{ wrapEnabled: boolean, cols: number, rows: number }} deps
    */
-  constructor(game) {
-    this.game = game;
+  constructor({ wrapEnabled, cols, rows }) {
+    this._wrapEnabled = wrapEnabled;
+    this._cols = cols;
+    this._rows = rows;
   }
 
   /** @returns {boolean} Whether wrap-around boundaries are enabled. */
   get enabled() {
-    return this.game.options.enableWrap;
+    return this._wrapEnabled;
   }
 
   /**
@@ -569,9 +572,9 @@ class BoundaryManager {
    * @returns {Point} The (possibly wrapped) position.
    */
   wrap(pos) {
-    if (!this.enabled) return pos;
-    pos.x = (pos.x + this.game.COLS) % this.game.COLS;
-    pos.y = (pos.y + this.game.ROWS) % this.game.ROWS;
+    if (!this._wrapEnabled) return pos;
+    pos.x = (pos.x + this._cols) % this._cols;
+    pos.y = (pos.y + this._rows) % this._rows;
     return pos;
   }
 
@@ -582,7 +585,7 @@ class BoundaryManager {
    * @returns {boolean}
    */
   isInBounds(x, y) {
-    return x >= 0 && x < this.game.COLS && y >= 0 && y < this.game.ROWS;
+    return x >= 0 && x < this._cols && y >= 0 && y < this._rows;
   }
 
   /**
@@ -592,7 +595,7 @@ class BoundaryManager {
    * @returns {Point} Cardinal direction vector.
    */
   dirBetween(a, b) {
-    return dirBetween(a, b, this.enabled);
+    return dirBetween(a, b, this._wrapEnabled);
   }
 }
 
@@ -603,19 +606,29 @@ class BoundaryManager {
  */
 class WormholesManager {
   /**
-   * @param {SnakeGame} game The owning game instance.
+   * @param {{
+   *   enabled: boolean,
+   *   cols: number, rows: number,
+   *   freeTileCount: () => number,
+   *   isOccupied: (x: number, y: number) => boolean,
+   *   wrap: (p: Point) => Point,
+   *   timers: TimerManager,
+   *   onDraw: () => void,
+   * }} deps
    */
-  constructor(game) {
-    this.game = game;
+  constructor({ enabled, cols, rows, freeTileCount, isOccupied, wrap, timers, onDraw }) {
+    this._enabled = enabled;
+    this._cols = cols;
+    this._rows = rows;
+    this._freeTileCount = freeTileCount;
+    this._isOccupied = isOccupied;
+    this._wrap = wrap;
+    this._timers = timers;
+    this._onDraw = onDraw;
     /** @type {Point|null} Wormhole entry cell. */
     this.entry = null;
     /** @type {Point|null} Wormhole exit cell. */
     this.exit = null;
-  }
-
-  /** @returns {boolean} Whether wormholes are enabled. */
-  get enabled() {
-    return this.game.options.enableWormholes;
   }
 
   /**
@@ -624,35 +637,27 @@ class WormholesManager {
    * Won't spawn if fewer than WORMHOLE_MIN_FREE_TILES free tiles remain.
    */
   trySpawn() {
-    if (!this.enabled) return;
-    if (this.game.freeTiles - this.game.snake.length <= WORMHOLE_MIN_FREE_TILES) return;
+    if (!this._enabled) return;
+    if (this._freeTileCount() <= WORMHOLE_MIN_FREE_TILES) return;
     let entry, exit;
     do {
-      entry = { x: Math.floor(Math.random() * this.game.COLS), y: Math.floor(Math.random() * this.game.ROWS) };
-    } while (
-      this.game.snake.has(entry.x, entry.y) ||
-      (this.game.food && this.game.food.x === entry.x && this.game.food.y === entry.y) ||
-      this.game.bonusFood.isAt(entry.x, entry.y) ||
-      this.game.walls.isWallAt(entry.x, entry.y)
-    );
+      entry = { x: Math.floor(Math.random() * this._cols), y: Math.floor(Math.random() * this._rows) };
+    } while (this._isOccupied(entry.x, entry.y));
     do {
-      exit = { x: Math.floor(Math.random() * this.game.COLS), y: Math.floor(Math.random() * this.game.ROWS) };
+      exit = { x: Math.floor(Math.random() * this._cols), y: Math.floor(Math.random() * this._rows) };
     } while (
       (exit.x === entry.x && exit.y === entry.y) ||
-      this.game.snake.has(exit.x, exit.y) ||
-      (this.game.food && this.game.food.x === exit.x && this.game.food.y === exit.y) ||
-      this.game.bonusFood.isAt(exit.x, exit.y) ||
-      this.game.walls.isWallAt(exit.x, exit.y) ||
+      this._isOccupied(exit.x, exit.y) ||
       Math.abs(exit.x - entry.x) + Math.abs(exit.y - entry.y) < WORMHOLE_MIN_DISTANCE
     );
     this.entry = entry;
     this.exit = exit;
-    this.game.timers.setTimeout(
+    this._timers.setTimeout(
       'wormholeLifetime',
       () => {
         this.entry = null;
         this.exit = null;
-        this.game._draw();
+        this._onDraw();
       },
       WORMHOLE_LIFETIME_MS
     );
@@ -665,12 +670,12 @@ class WormholesManager {
    * @returns {boolean} Whether a teleport occurred.
    */
   tryTeleport(head) {
-    if (!this.enabled || !this.entry) return false;
+    if (!this._enabled || !this.entry) return false;
     if (head.x === this.entry.x && head.y === this.entry.y) {
       head.x = this.exit.x;
       head.y = this.exit.y;
-      this.game.boundary.wrap(head);
-      this.game.timers.clear('wormholeLifetime');
+      this._wrap(head);
+      this._timers.clear('wormholeLifetime');
       this.entry = null;
       this.exit = null;
       return true;
@@ -684,7 +689,7 @@ class WormholesManager {
    * @param {number} cellSize Pixel size of each grid cell.
    */
   draw(ctx, cellSize) {
-    if (!this.enabled || !this.entry) return;
+    if (!this._enabled || !this.entry) return;
     ctx.fillStyle = COLOR_WORMHOLE_ENTRY;
     ctx.fillRect(this.entry.x * cellSize + 1, this.entry.y * cellSize + 1, cellSize - 2, cellSize - 2);
     ctx.fillStyle = COLOR_WORMHOLE_EXIT;
@@ -693,13 +698,13 @@ class WormholesManager {
 
   /** Starts the periodic wormhole spawn interval (every 30s). */
   startTimers() {
-    if (!this.enabled) return;
-    this.game.timers.setInterval(
+    if (!this._enabled) return;
+    this._timers.setInterval(
       'wormholeTimer',
       () => {
         if (!this.entry) {
           this.trySpawn();
-          this.game._draw();
+          this._onDraw();
         }
       },
       WORMHOLE_SPAWN_INTERVAL_MS
@@ -715,26 +720,61 @@ class WormholesManager {
  */
 class BonusFoodManager {
   /**
-   * @param {SnakeGame} game The owning game instance.
+   * @param {{
+   *   enabled: boolean, timed: boolean, canShrink: boolean, isConstrictor: boolean,
+   *   cols: number, rows: number,
+   *   snakeHas: (x: number, y: number) => boolean,
+   *   snakeLength: () => number,
+   *   isWallAt: (x: number, y: number) => boolean,
+   *   getFoodPos: () => Point | null,
+   *   wrapEnabled: boolean, wrap: (p: Point) => Point,
+   *   isInBounds: (x: number, y: number) => boolean,
+   *   timers: TimerManager,
+   *   getCurrentSpeed: () => number,
+   *   isFoodEnclosed: (p: Point) => boolean,
+   *   onEatCallback: () => void,
+   * }} deps
    */
-  constructor(game) {
-    this.game = game;
+  constructor({
+    enabled,
+    timed,
+    canShrink,
+    isConstrictor,
+    cols,
+    rows,
+    snakeHas,
+    snakeLength,
+    isWallAt,
+    getFoodPos,
+    wrapEnabled,
+    wrap,
+    isInBounds,
+    timers,
+    getCurrentSpeed,
+    isFoodEnclosed,
+    onEatCallback,
+  }) {
+    this._enabled = enabled;
+    this._timed = timed;
+    this._canShrink = canShrink;
+    this._isConstrictor = isConstrictor;
+    this._cols = cols;
+    this._rows = rows;
+    this._snakeHas = snakeHas;
+    this._snakeLength = snakeLength;
+    this._isWallAt = isWallAt;
+    this._getFoodPos = getFoodPos;
+    this._wrapEnabled = wrapEnabled;
+    this._wrap = wrap;
+    this._isInBounds = isInBounds;
+    this._timers = timers;
+    this._getCurrentSpeed = getCurrentSpeed;
+    this._isFoodEnclosed = isFoodEnclosed;
+    this._onEatCallback = onEatCallback;
     /** @type {Point|null} Current bonus food position. */
     this.pos = null;
   }
 
-  /** @returns {boolean} Whether bonus food is enabled. */
-  get enabled() {
-    return this.game.options.enableBonusFood;
-  }
-  /** @returns {boolean} Whether timed spawn (every 15s) is enabled. */
-  get timed() {
-    return this.game.options.enableTimedBonusFood;
-  }
-  /** @returns {boolean} Whether eating bonus food shrinks the snake. */
-  get canShrink() {
-    return this.game.options.enableShrinkOnBonusFood;
-  }
   /** @returns {boolean} Whether bonus food is currently on the board. */
   get active() {
     return this.pos !== null;
@@ -755,21 +795,21 @@ class BonusFoodManager {
    * lifetime timers.
    */
   place() {
-    if (!this.enabled) return;
+    if (!this._enabled) return;
     let pos;
     do {
-      pos = { x: Math.floor(Math.random() * this.game.COLS), y: Math.floor(Math.random() * this.game.ROWS) };
+      pos = { x: Math.floor(Math.random() * this._cols), y: Math.floor(Math.random() * this._rows) };
     } while (
-      this.game.snake.has(pos.x, pos.y) ||
-      (this.game.food && this.game.food.x === pos.x && this.game.food.y === pos.y) ||
-      this.game.walls.isWallAt(pos.x, pos.y)
+      this._snakeHas(pos.x, pos.y) ||
+      (this._getFoodPos() && this._getFoodPos().x === pos.x && this._getFoodPos().y === pos.y) ||
+      this._isWallAt(pos.x, pos.y)
     );
     this.pos = pos;
-    this.game.timers.setInterval('bonusFoodInterval', () => this._move(), this.game.currentSpeed + 60);
-    this.game.timers.setTimeout(
+    this._timers.setInterval('bonusFoodInterval', () => this._move(), this._getCurrentSpeed() + 60);
+    this._timers.setTimeout(
       'bonusFoodTimeout',
       () => {
-        this.game.timers.clear('bonusFoodInterval');
+        this._timers.clear('bonusFoodInterval');
         this.pos = null;
       },
       BONUS_FOOD_LIFETIME_MS
@@ -792,19 +832,19 @@ class BonusFoodManager {
     ];
     const dir = dirs[Math.floor(Math.random() * dirs.length)];
     const next = { x: this.pos.x + dir.x, y: this.pos.y + dir.y };
-    const obstacleFree = () => !this.game.snake.has(next.x, next.y) && !this.game.walls.isWallAt(next.x, next.y);
-    if (this.game.boundary.enabled) {
-      this.game.boundary.wrap(next);
+    const obstacleFree = () => !this._snakeHas(next.x, next.y) && !this._isWallAt(next.x, next.y);
+    if (this._wrapEnabled) {
+      this._wrap(next);
       if (obstacleFree()) {
         this.pos = next;
       }
     } else {
-      if (this.game.boundary.isInBounds(next.x, next.y) && obstacleFree()) {
+      if (this._isInBounds(next.x, next.y) && obstacleFree()) {
         this.pos = next;
       }
     }
-    if (this.game.options.mode === MODE_CONSTRICTOR && this.pos && this.game._isFoodEnclosed(this.pos)) {
-      this.game._eatBonusFood();
+    if (this._isConstrictor && this.pos && this._isFoodEnclosed(this.pos)) {
+      this._onEatCallback();
     }
   }
 
@@ -814,7 +854,7 @@ class BonusFoodManager {
    * @returns {boolean}
    */
   isHeadCollision(head) {
-    return this.enabled && this.active && head.x === this.pos.x && head.y === this.pos.y;
+    return this._enabled && this.active && head.x === this.pos.x && head.y === this.pos.y;
   }
 
   /**
@@ -822,25 +862,28 @@ class BonusFoodManager {
    * @returns {boolean}
    */
   isEnclosed() {
-    return this.enabled && this.active && this.game._isFoodEnclosed(this.pos);
+    return this._enabled && this.active && this._isFoodEnclosed(this.pos);
   }
 
   /**
-   * Handles bonus food consumption. Shrinks the snake if enabled, clears bonus
-   * food timers, and removes the bonus food from the board.
-   * @returns {number} Points awarded (100).
+   * Handles bonus food consumption. Returns points awarded and optional shrink amount.
+   * The caller (SnakeGame) applies the shrink to the snake.
+   * @returns {{ points: number, shrinkBy: number }}
    */
   onEat() {
-    if (this.canShrink) {
-      const shrunkLen = Math.ceil(this.game.snake.length / 2);
-      if (this.game.options.mode !== MODE_CONSTRICTOR || shrunkLen >= 15) {
-        this.game.snake.splice(shrunkLen);
+    if (this._canShrink) {
+      const shrunkLen = Math.ceil(this._snakeLength() / 2);
+      if (!this._isConstrictor || shrunkLen >= 15) {
+        this._timers.clear('bonusFoodInterval');
+        this._timers.clear('bonusFoodTimeout');
+        this.pos = null;
+        return { points: 100, shrinkBy: shrunkLen };
       }
     }
-    this.game.timers.clear('bonusFoodInterval');
-    this.game.timers.clear('bonusFoodTimeout');
+    this._timers.clear('bonusFoodInterval');
+    this._timers.clear('bonusFoodTimeout');
     this.pos = null;
-    return 100;
+    return { points: 100, shrinkBy: 0 };
   }
 
   /**
@@ -849,7 +892,7 @@ class BonusFoodManager {
    * @param {number} cellSize Pixel size of each grid cell.
    */
   draw(ctx, cellSize) {
-    if (!this.enabled || !this.pos) return;
+    if (!this._enabled || !this.pos) return;
     const cx = this.pos.x * cellSize + cellSize / 2;
     const cy = this.pos.y * cellSize + cellSize / 2;
     const r = 8;
@@ -868,7 +911,7 @@ class BonusFoodManager {
    * @param {number} foodsEaten Total regular foods eaten.
    */
   trySpawnOnCount(foodsEaten) {
-    if (!this.enabled || this.timed) return;
+    if (!this._enabled || this._timed) return;
     if (foodsEaten % 5 === 0 && !this.active) {
       this.place();
     }
@@ -876,8 +919,8 @@ class BonusFoodManager {
 
   /** Starts the timed bonus-food spawn interval (every 15s). */
   startTimers() {
-    if (!this.enabled || !this.timed) return;
-    this.game.timers.setInterval(
+    if (!this._enabled || !this._timed) return;
+    this._timers.setInterval(
       'bonusFoodTimer',
       () => {
         if (!this.active) this.place();
@@ -888,12 +931,12 @@ class BonusFoodManager {
 
   /** Resumes movement and lifetime timers for an active bonus food after unpause. */
   resumeMovementTimers() {
-    if (!this.enabled || !this.active) return;
-    this.game.timers.setInterval('bonusFoodInterval', () => this._move(), this.game.currentSpeed + 60);
-    this.game.timers.setTimeout(
+    if (!this._enabled || !this.active) return;
+    this._timers.setInterval('bonusFoodInterval', () => this._move(), this._getCurrentSpeed() + 60);
+    this._timers.setTimeout(
       'bonusFoodTimeout',
       () => {
-        this.game.timers.clear('bonusFoodInterval');
+        this._timers.clear('bonusFoodInterval');
         this.pos = null;
       },
       BONUS_FOOD_LIFETIME_MS
@@ -902,18 +945,18 @@ class BonusFoodManager {
 
   /** Clears only the bonus food movement interval. */
   clearMovementInterval() {
-    this.game.timers.clear('bonusFoodInterval');
+    this._timers.clear('bonusFoodInterval');
   }
 
   /** Clears both the bonus food movement interval and lifetime timeout. */
   clearMovementTimers() {
-    this.game.timers.clear('bonusFoodInterval');
-    this.game.timers.clear('bonusFoodTimeout');
+    this._timers.clear('bonusFoodInterval');
+    this._timers.clear('bonusFoodTimeout');
   }
 
   /** Clears all bonus-food-related timers (spawn + movement + lifetime). */
   clearAllTimers() {
-    this.game.timers.clear('bonusFoodTimer');
+    this._timers.clear('bonusFoodTimer');
     this.clearMovementTimers();
   }
 }
@@ -926,17 +969,14 @@ class BonusFoodManager {
  */
 class ScoreBonusManager {
   /**
-   * @param {SnakeGame} game The owning game instance.
+   * @param {{ enabled: boolean, timers: TimerManager, getBonusElement: () => HTMLElement | null }} deps
    */
-  constructor(game) {
-    this.game = game;
+  constructor({ enabled, timers, getBonusElement }) {
+    this._enabled = enabled;
+    this._timers = timers;
+    this._getBonusElement = getBonusElement;
     /** @type {number} Current bonus value (0-100). */
     this.value = 100;
-  }
-
-  /** @returns {boolean} Whether the score bonus feature is enabled. */
-  get enabled() {
-    return this.game.options.enableScoreBonus;
   }
 
   /**
@@ -944,7 +984,7 @@ class ScoreBonusManager {
    * @returns {string} HTML string, empty if disabled.
    */
   getHUDHtml() {
-    return this.enabled ? '<span class="snake-bonus">Bonus: 0</span>' : '';
+    return this._enabled ? '<span class="snake-bonus">Bonus: 0</span>' : '';
   }
 
   /**
@@ -953,25 +993,25 @@ class ScoreBonusManager {
    * @returns {number} Bonus points to add.
    */
   onFoodEaten() {
-    if (!this.enabled) return 0;
+    if (!this._enabled) return 0;
     const bonus = this.value > 0 ? this.value : 0;
     this.value = 100;
-    if (this.game.bonusElement) {
-      this.game.bonusElement.textContent = `Bonus: ${this.value}`;
-    }
+    const el = this._getBonusElement();
+    if (el) el.textContent = `Bonus: ${this.value}`;
     this.startDecay();
     return bonus;
   }
 
   /** Starts the bonus decay interval (decrements by 1 every 200ms). */
   startDecay() {
-    if (!this.enabled) return;
-    this.game.timers.setInterval(
+    if (!this._enabled) return;
+    this._timers.setInterval(
       'scoreBonusInterval',
       () => {
         this.value = Math.max(0, this.value - 1);
-        this.game.bonusElement.textContent = `Bonus: ${this.value}`;
-        if (this.value === 0) this.game.timers.clear('scoreBonusInterval');
+        const el = this._getBonusElement();
+        if (el) el.textContent = `Bonus: ${this.value}`;
+        if (this.value === 0) this._timers.clear('scoreBonusInterval');
       },
       SCORE_BONUS_DECAY_INTERVAL_MS
     );
@@ -979,12 +1019,12 @@ class ScoreBonusManager {
 
   /** Clears the score bonus decay interval. */
   clearTimers() {
-    this.game.timers.clear('scoreBonusInterval');
+    this._timers.clear('scoreBonusInterval');
   }
 
   /** Restarts the decay interval after unpause, if the bonus value is still > 0. */
   resumeDecay() {
-    if (this.enabled && this.value > 0) this.startDecay();
+    if (this._enabled && this.value > 0) this.startDecay();
   }
 }
 
@@ -995,33 +1035,36 @@ class ScoreBonusManager {
  */
 class SpeedManager {
   /**
-   * @param {SnakeGame} game The owning game instance.
+   * @param {{ enabled: boolean, baseSpeed: number, minSpeed: number, rateStep: number, timers: TimerManager, scheduleNextTick: () => void }} deps
    */
-  constructor(game) {
-    this.game = game;
-  }
-
-  /** @returns {boolean} Whether speed-up is enabled. */
-  get enabled() {
-    return this.game.options.enableSpeedUp;
+  constructor({ enabled, baseSpeed, minSpeed, rateStep, timers, scheduleNextTick }) {
+    this._enabled = enabled;
+    this._baseSpeed = baseSpeed;
+    this._minSpeed = minSpeed;
+    this._rateStep = rateStep;
+    this._timers = timers;
+    this._scheduleNextTick = scheduleNextTick;
+    /** @type {number} Current game loop interval in ms. */
+    this.currentSpeed = baseSpeed;
   }
 
   /**
    * Called after eating regular food. Recalculates `currentSpeed` and
    * restarts the game loop with the new interval.
+   * @param {number} foodsEaten Total regular foods eaten.
    */
-  onFoodEaten() {
-    if (!this.enabled) return;
-    const baseTickRate = 1000 / this.game.BASE_SPEED;
-    const tickRate = baseTickRate + this.game.RATE_STEP * this.game.foodsEaten;
-    this.game.currentSpeed = Math.max(this.game.MIN_SPEED, 1000 / tickRate);
+  onFoodEaten(foodsEaten) {
+    if (!this._enabled) return;
+    const baseTickRate = 1000 / this._baseSpeed;
+    const tickRate = baseTickRate + this._rateStep * foodsEaten;
+    this.currentSpeed = Math.max(this._minSpeed, 1000 / tickRate);
     this.restartGameLoop();
   }
 
   /** Clears the current game loop and schedules the next tick. */
   restartGameLoop() {
-    this.game.timers.clear('gameLoop');
-    this.game._scheduleNextTick();
+    this._timers.clear('gameLoop');
+    this._scheduleNextTick();
   }
 }
 
@@ -1032,27 +1075,34 @@ class SpeedManager {
  */
 class InputManager {
   /**
-   * @param {SnakeGame} game The owning game instance.
+   * @param {{
+   *   enableBuffer: boolean,
+   *   enableBoost: boolean,
+   *   enableInstant: boolean,
+   *   isDirSafe: (dir: Point) => boolean,
+   *   getState: () => string,
+   *   onUpdate: () => void,
+   *   scheduleNextTick: () => void,
+   * }} deps
    */
-  constructor(game) {
-    this.game = game;
+  constructor({ enableBuffer, enableBoost, enableInstant, isDirSafe, getState, onUpdate, scheduleNextTick }) {
+    this._enableBuffer = enableBuffer;
+    this._enableBoost = enableBoost;
+    this._enableInstant = enableInstant;
+    this._isDirSafe = isDirSafe;
+    this._getState = getState;
+    this._onUpdate = onUpdate;
+    this._scheduleNextTick = scheduleNextTick;
     /** @type {Point[]} Buffered direction inputs (max 2). */
     this.buffer = [];
     /** @type {boolean} Whether speed boost is currently active. */
     this.speedBoostActive = false;
-  }
-
-  /** @returns {boolean} Whether input buffering is enabled. */
-  get enableBuffer() {
-    return this.game.options.enableInputBuffer;
-  }
-  /** @returns {boolean} Whether speed boost is enabled. */
-  get enableBoost() {
-    return this.game.options.enableSpeedBoost;
-  }
-  /** @returns {boolean} Whether instant movement is enabled. */
-  get enableInstant() {
-    return this.game.options.enableInstantMovement;
+    /** @type {Point} Current movement direction. */
+    this.direction = { x: 0, y: 0 };
+    /** @type {Point} Next direction to apply (non-buffered mode). */
+    this.nextDirection = { x: 0, y: 0 };
+    /** @type {Point} Direction committed during grace period for rendering. */
+    this.graceDirection = { x: 0, y: 0 };
   }
 
   /**
@@ -1060,12 +1110,12 @@ class InputManager {
    * Skips opposite and duplicate directions. Deactivates boost on direction change.
    */
   commitDirection() {
-    if (this.enableBuffer) {
-      const prevDir = { x: this.game.direction.x, y: this.game.direction.y };
+    if (this._enableBuffer) {
+      const prevDir = { x: this.direction.x, y: this.direction.y };
       let effectiveDir =
-        this.game.graceDirection.x !== 0 || this.game.graceDirection.y !== 0
-          ? { x: this.game.graceDirection.x, y: this.game.graceDirection.y }
-          : { x: this.game.direction.x, y: this.game.direction.y };
+        this.graceDirection.x !== 0 || this.graceDirection.y !== 0
+          ? { x: this.graceDirection.x, y: this.graceDirection.y }
+          : { x: this.direction.x, y: this.direction.y };
 
       while (this.buffer.length > 0) {
         const next = this.buffer[0];
@@ -1075,7 +1125,7 @@ class InputManager {
           this.buffer.shift();
           continue;
         }
-        if (this.game.collision.isDirSafe(next)) {
+        if (this._isDirSafe(next)) {
           this.buffer.shift();
           effectiveDir = next;
           break;
@@ -1083,15 +1133,15 @@ class InputManager {
         break;
       }
 
-      this.game.direction = effectiveDir;
-      if (prevDir.x !== this.game.direction.x || prevDir.y !== this.game.direction.y) {
+      this.direction = effectiveDir;
+      if (prevDir.x !== this.direction.x || prevDir.y !== this.direction.y) {
         this._deactivateBoost();
       }
-      if (this.game.graceDirection.x !== 0 || this.game.graceDirection.y !== 0) {
-        this.game.graceDirection = { x: 0, y: 0 };
+      if (this.graceDirection.x !== 0 || this.graceDirection.y !== 0) {
+        this.graceDirection = { x: 0, y: 0 };
       }
     } else {
-      this.game.direction = this.game.nextDirection;
+      this.direction = this.nextDirection;
     }
   }
 
@@ -1103,8 +1153,8 @@ class InputManager {
    * @returns {boolean} Whether the input was accepted (led to a move or boost).
    */
   handlePlayingInput(dir) {
-    if (this.enableBuffer) {
-      const ref = this.buffer.length > 0 ? this.buffer[this.buffer.length - 1] : this.game.direction;
+    if (this._enableBuffer) {
+      const ref = this.buffer.length > 0 ? this.buffer[this.buffer.length - 1] : this.direction;
       const isOpposite = dir.x === -ref.x && dir.y === -ref.y;
       const isDuplicate = dir.x === ref.x && dir.y === ref.y;
       if (!isOpposite && !isDuplicate && this.buffer.length < 2) {
@@ -1112,13 +1162,13 @@ class InputManager {
       }
     }
     let accepted = false;
-    if (dir.x === this.game.direction.x && dir.y === this.game.direction.y) {
+    if (dir.x === this.direction.x && dir.y === this.direction.y) {
       const wasActive = this.speedBoostActive;
       this._activateBoost();
-      accepted = this.enableBoost && !wasActive;
-    } else if (dir.x !== -this.game.direction.x || dir.y !== -this.game.direction.y) {
-      if (!this.enableBuffer) {
-        this.game.nextDirection = dir;
+      accepted = this._enableBoost && !wasActive;
+    } else if (dir.x !== -this.direction.x || dir.y !== -this.direction.y) {
+      if (!this._enableBuffer) {
+        this.nextDirection = dir;
       }
       this._deactivateBoost();
       accepted = true;
@@ -1126,12 +1176,12 @@ class InputManager {
       this._deactivateBoost();
     }
 
-    if (accepted && this.game.state === STATE.PLAYING) {
-      if (this.enableInstant) {
-        this.game._update();
-      }
-      if (this.game.state === STATE.PLAYING) {
-        this.game._scheduleNextTick();
+    if (accepted && this._getState() === STATE.PLAYING) {
+      if (this._enableInstant) {
+        this._onUpdate();
+        if (this._getState() === STATE.PLAYING) {
+          this._scheduleNextTick();
+        }
       }
     }
     return accepted;
@@ -1142,7 +1192,7 @@ class InputManager {
    * @private
    */
   _activateBoost() {
-    if (!this.enableBoost || this.speedBoostActive) return;
+    if (!this._enableBoost || this.speedBoostActive) return;
     this.speedBoostActive = true;
   }
 
@@ -1173,15 +1223,44 @@ class InputManager {
  */
 class CollisionResolver {
   /**
-   * @param {SnakeGame} game The owning game instance.
+   * @param {{
+   *   graceEnabled: boolean,
+   *   isConstrictor: boolean,
+   *   isWallAt: (x: number, y: number) => boolean,
+   *   snakeHas: (x: number, y: number) => boolean,
+   *   snakeHead: () => Point,
+   *   wrap: (p: Point) => Point,
+   *   cols: number,
+   *   rows: number,
+   *   onEnterWarning: () => void,
+   *   onEnterIgnored: () => void,
+   *   onGameOver: () => void,
+   * }} deps
    */
-  constructor(game) {
-    this.game = game;
-  }
-
-  /** @returns {boolean} Whether the grace period is enabled. */
-  get graceEnabled() {
-    return this.game.options.enableGracePeriod;
+  constructor({
+    graceEnabled,
+    isConstrictor,
+    isWallAt,
+    snakeHas,
+    snakeHead,
+    wrap,
+    cols,
+    rows,
+    onEnterWarning,
+    onEnterIgnored,
+    onGameOver,
+  }) {
+    this._graceEnabled = graceEnabled;
+    this._isConstrictor = isConstrictor;
+    this._isWallAt = isWallAt;
+    this._snakeHas = snakeHas;
+    this._snakeHead = snakeHead;
+    this._wrap = wrap;
+    this._cols = cols;
+    this._rows = rows;
+    this._onEnterWarning = onEnterWarning;
+    this._onEnterIgnored = onEnterIgnored;
+    this._onGameOver = onGameOver;
   }
 
   /**
@@ -1191,9 +1270,9 @@ class CollisionResolver {
    */
   getCollision(pos) {
     return {
-      wall: this.game.walls.isWallAt(pos.x, pos.y),
-      boundary: pos.x < 0 || pos.x >= this.game.COLS || pos.y < 0 || pos.y >= this.game.ROWS,
-      self: this.game.snake.has(pos.x, pos.y),
+      wall: this._isWallAt(pos.x, pos.y),
+      boundary: pos.x < 0 || pos.x >= this._cols || pos.y < 0 || pos.y >= this._rows,
+      self: this._snakeHas(pos.x, pos.y),
     };
   }
 
@@ -1208,8 +1287,9 @@ class CollisionResolver {
       { x: -1, y: 0 },
       { x: 1, y: 0 },
     ];
+    const head = this._snakeHead();
     for (const dir of dirs) {
-      const pos = this.game.boundary.wrap({ x: this.game.snake.head().x + dir.x, y: this.game.snake.head().y + dir.y });
+      const pos = this._wrap({ x: head.x + dir.x, y: head.y + dir.y });
       const c = this.getCollision(pos);
       if (!c.wall && !c.boundary && !c.self) {
         return true;
@@ -1224,7 +1304,8 @@ class CollisionResolver {
    * @returns {boolean} True if no wall, boundary, or self collision.
    */
   isDirSafe(dir) {
-    const pos = this.game.boundary.wrap({ x: this.game.snake.head().x + dir.x, y: this.game.snake.head().y + dir.y });
+    const head = this._snakeHead();
+    const pos = this._wrap({ x: head.x + dir.x, y: head.y + dir.y });
     const c = this.getCollision(pos);
     return !c.wall && !c.boundary && !c.self;
   }
@@ -1238,18 +1319,18 @@ class CollisionResolver {
   resolve(nextHead) {
     const { wall, boundary, self } = this.getCollision(nextHead);
     if (wall || boundary || self) {
-      if (this.game.options.mode === MODE_CONSTRICTOR && self) {
+      if (this._isConstrictor && self) {
         if (this.hasAnySafeMove()) {
-          this.game._enterIgnored();
+          this._onEnterIgnored();
         } else {
-          this.game._gameOver();
+          this._onGameOver();
         }
         return true;
       }
-      if (this.graceEnabled) {
-        this.game._enterWarning();
+      if (this._graceEnabled) {
+        this._onEnterWarning();
       } else {
-        this.game._gameOver();
+        this._onGameOver();
       }
       return true;
     }
@@ -1322,21 +1403,87 @@ class SnakeGame {
     this.TIME_LIMIT = 120000;
 
     /** @type {WallsManager} */
-    this.walls = new WallsManager(this);
+    this.walls = new WallsManager({ enabled: this.options.enableWalls });
     /** @type {BoundaryManager} */
-    this.boundary = new BoundaryManager(this);
+    this.boundary = new BoundaryManager({ wrapEnabled: this.options.enableWrap, cols: this.COLS, rows: this.ROWS });
+
+    /** @type {TimerManager} */
+    this.timers = new TimerManager();
+
     /** @type {WormholesManager} */
-    this.wormholes = new WormholesManager(this);
+    this.wormholes = new WormholesManager({
+      enabled: this.options.enableWormholes,
+      cols: this.COLS,
+      rows: this.ROWS,
+      freeTileCount: () => this.freeTiles - this.snake.length,
+      isOccupied: (x, y) =>
+        this.snake.has(x, y) ||
+        (this.food && this.food.x === x && this.food.y === y) ||
+        this.bonusFood.isAt(x, y) ||
+        this.walls.isWallAt(x, y),
+      wrap: (p) => this.boundary.wrap(p),
+      timers: this.timers,
+      onDraw: () => this._draw(),
+    });
     /** @type {BonusFoodManager} */
-    this.bonusFood = new BonusFoodManager(this);
+    this.bonusFood = new BonusFoodManager({
+      enabled: this.options.enableBonusFood,
+      timed: this.options.enableTimedBonusFood,
+      canShrink: this.options.enableShrinkOnBonusFood,
+      isConstrictor: this.options.mode === MODE_CONSTRICTOR,
+      cols: this.COLS,
+      rows: this.ROWS,
+      snakeHas: (x, y) => this.snake.has(x, y),
+      snakeLength: () => this.snake.length,
+      isWallAt: (x, y) => this.walls.isWallAt(x, y),
+      getFoodPos: () => this.food,
+      wrapEnabled: this.options.enableWrap,
+      wrap: (p) => this.boundary.wrap(p),
+      isInBounds: (x, y) => this.boundary.isInBounds(x, y),
+      timers: this.timers,
+      getCurrentSpeed: () => this.speed.currentSpeed,
+      isFoodEnclosed: (p) => this._isFoodEnclosed(p),
+      onEatCallback: () => this._eatBonusFood(),
+    });
     /** @type {ScoreBonusManager} */
-    this.scoreBonus = new ScoreBonusManager(this);
+    this.scoreBonus = new ScoreBonusManager({
+      enabled: this.options.enableScoreBonus,
+      timers: this.timers,
+      getBonusElement: () => this.bonusElement,
+    });
     /** @type {InputManager} */
-    this.input = new InputManager(this);
+    this.input = new InputManager({
+      enableBuffer: this.options.enableInputBuffer,
+      enableBoost: this.options.enableSpeedBoost,
+      enableInstant: this.options.enableInstantMovement,
+      isDirSafe: (dir) => this.collision.isDirSafe(dir),
+      getState: () => this.state,
+      onUpdate: () => this._update(),
+      scheduleNextTick: () => this._scheduleNextTick(),
+    });
     /** @type {SpeedManager} */
-    this.speed = new SpeedManager(this);
+    this.speed = new SpeedManager({
+      enabled: this.options.enableSpeedUp,
+      baseSpeed: this.BASE_SPEED,
+      minSpeed: this.MIN_SPEED,
+      rateStep: this.RATE_STEP,
+      timers: this.timers,
+      scheduleNextTick: () => this._scheduleNextTick(),
+    });
     /** @type {CollisionResolver} */
-    this.collision = new CollisionResolver(this);
+    this.collision = new CollisionResolver({
+      graceEnabled: this.options.enableGracePeriod,
+      isConstrictor: this.options.mode === MODE_CONSTRICTOR,
+      isWallAt: (x, y) => this.walls.isWallAt(x, y),
+      snakeHas: (x, y) => this.snake.has(x, y),
+      snakeHead: () => this.snake.head(),
+      wrap: (p) => this.boundary.wrap(p),
+      cols: this.COLS,
+      rows: this.ROWS,
+      onEnterWarning: () => this._enterWarning(),
+      onEnterIgnored: () => this._enterIgnored(),
+      onGameOver: () => this._gameOver(),
+    });
 
     this._buildDOM();
     this._bindEvents();
@@ -1417,27 +1564,24 @@ class SnakeGame {
   init() {
     /** @type {SnakeBody} Snake body segments (head is index 0). */
     this.snake = new SnakeBody([{ x: 10, y: 10 }]);
-    /** @type {Point} Current movement direction. */
-    this.direction = { x: 0, y: 0 };
-    /** @type {Point} Next direction to apply (non-buffered mode). */
-    this.nextDirection = { x: 0, y: 0 };
-    /** @type {number} Current score. */
     this.score = 0;
     this.elapsed = 0;
     this._transitionTo(STATE.WAITING);
-    this.currentSpeed = this.BASE_SPEED;
+    this.speed.currentSpeed = this.BASE_SPEED;
     this.foodsEaten = 0;
     this.scoreBonus.value = 100;
     this.wasPaused = false;
     this.input.speedBoostActive = false;
     this.input.buffer = [];
-    this.graceDirection = { x: 0, y: 0 };
+    this.input.direction = { x: 0, y: 0 };
+    this.input.nextDirection = { x: 0, y: 0 };
+    this.input.graceDirection = { x: 0, y: 0 };
     this.growth = 0;
     this.startGrowth = 0;
     this.warningElapsed = 0;
     this.wormholes.entry = null;
     this.wormholes.exit = null;
-    this.timers = new TimerManager();
+    this.timers.clearAll();
     this.freeTiles = this.COLS * this.ROWS;
     if (this.walls.enabled) {
       this.freeTiles -= this.walls.count;
@@ -1590,7 +1734,7 @@ class SnakeGame {
     }
     this.bonusFood.trySpawnOnCount(this.foodsEaten);
     this._placeFood();
-    this.speed.onFoodEaten();
+    this.speed.onFoodEaten(this.foodsEaten);
   }
 
   /**
@@ -1599,8 +1743,12 @@ class SnakeGame {
    * @private
    */
   _eatBonusFood() {
-    this.score += this.bonusFood.onEat();
+    const result = this.bonusFood.onEat();
+    this.score += result.points;
     this.scoreElement.textContent = `Score: ${this.score}`;
+    if (result.shrinkBy > 0) {
+      this.snake.splice(result.shrinkBy);
+    }
   }
 
   /**
@@ -1739,7 +1887,7 @@ class SnakeGame {
    */
   _getSegmentTileKey(i) {
     if (i === 0) {
-      const d = this.direction.x === 0 && this.direction.y === 0 ? { x: 1, y: 0 } : this.direction;
+      const d = this.input.direction.x === 0 && this.input.direction.y === 0 ? { x: 1, y: 0 } : this.input.direction;
       return `head${DIR_KEY[`${d.x},${d.y}`]}`;
     }
 
@@ -1786,7 +1934,10 @@ class SnakeGame {
    * @returns {Point} The resolved next head position.
    */
   _resolveNextHead() {
-    const nextHead = { x: this.snake.head().x + this.direction.x, y: this.snake.head().y + this.direction.y };
+    const nextHead = {
+      x: this.snake.head().x + this.input.direction.x,
+      y: this.snake.head().y + this.input.direction.y,
+    };
     this.boundary.wrap(nextHead);
     this.wormholes.tryTeleport(nextHead);
     return nextHead;
@@ -1885,7 +2036,7 @@ class SnakeGame {
    * @private
    */
   _scheduleNextTick() {
-    const delay = this.input.speedBoostActive ? this.currentSpeed / SPEED_BOOST_FACTOR : this.currentSpeed;
+    const delay = this.input.speedBoostActive ? this.speed.currentSpeed / SPEED_BOOST_FACTOR : this.speed.currentSpeed;
     this.timers.setTimeout(
       'gameLoop',
       () => {
@@ -1927,7 +2078,7 @@ class SnakeGame {
     this.warningStart = Date.now();
     this.warningElapsed = 0;
     this.messageElement.textContent = '';
-    this.graceDirection = { x: this.direction.x, y: this.direction.y };
+    this.input.graceDirection = { x: this.input.direction.x, y: this.input.direction.y };
     this._draw();
     this.timers.setTimeout(
       'warningTimeout',
@@ -2095,8 +2246,8 @@ class SnakeGame {
    * @param {Point} dir
    */
   _handleInputWaiting(dir) {
-    this.nextDirection = dir;
-    this.direction = dir;
+    this.input.nextDirection = dir;
+    this.input.direction = dir;
     this._startGame();
   }
 
@@ -2111,9 +2262,9 @@ class SnakeGame {
     const c = this.collision.getCollision(newHead);
     if (c.wall || c.boundary || c.self) return;
     this.timers.clear('warningTimeout');
-    this.direction = dir;
-    this.nextDirection = dir;
-    this.graceDirection = { x: 0, y: 0 };
+    this.input.direction = dir;
+    this.input.nextDirection = dir;
+    this.input.graceDirection = { x: 0, y: 0 };
     this._transitionTo(STATE.PLAYING);
     this.messageElement.textContent = '';
     this.input.resetBoost();
@@ -2132,8 +2283,8 @@ class SnakeGame {
     const c = this.collision.getCollision(newHead);
     if (c.wall || c.boundary || c.self) return;
     this.input.clearBuffer();
-    this.direction = dir;
-    this.nextDirection = dir;
+    this.input.direction = dir;
+    this.input.nextDirection = dir;
     this._transitionTo(STATE.PLAYING);
     this.messageElement.textContent = '';
     this._scheduleNextTick();
