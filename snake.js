@@ -1927,12 +1927,12 @@ class SnakeGame {
 
     this.snake.forEach((seg, i) => {
       let key = this._getSegmentTileKey(i);
-      if (i === 0 && this.input.speedBoostActive) {
-        key += '_b';
-      } else if (this.state === STATE.IGNORED) {
+      if (this.state === STATE.IGNORED) {
         key += '_i';
       } else if (this.state === STATE.WARNING) {
         key += '_w';
+      } else if (i === 0 && this.input.speedBoostActive) {
+        key += '_b';
       }
       this.ctx.drawImage(
         this.tiles[key],
