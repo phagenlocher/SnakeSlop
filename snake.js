@@ -1637,7 +1637,7 @@ class SnakeGame {
           ${this.scoreBonus.getHUDHtml()}
           <span class="snake-timer">Time: 0:00</span>
         </div>
-        <div class="snake-game-wrapper"><canvas class="snake-canvas" width="500" height="500" tabindex="0"></canvas><div class="snake-focus-overlay">Click or tap to focus</div></div>
+        <div class="snake-game-wrapper"><canvas class="snake-canvas" tabindex="0"></canvas><div class="snake-focus-overlay">Click or tap to focus</div></div>
         <div class="snake-message">Press any arrow key to start</div>
       </div>
     `;
@@ -1649,12 +1649,30 @@ class SnakeGame {
     this.bonusElement = this.container.querySelector('.snake-bonus');
     this.messageElement = this.container.querySelector('.snake-message');
     this.overlay = this.container.querySelector('.snake-focus-overlay');
-    this.CELL_SIZE = this.canvas.width / this.COLS;
-    this._createTiles();
+    this.wrapper = this.container.querySelector('.snake-game-wrapper');
+    this._resizeCanvas();
   }
 
   /**
-   * Binds focus, blur, and overlay-click event listeners for pause/resume.
+   * Computes the canvas pixel size from available width, sets CELL_SIZE,
+   * recreates tiles, and redraws.
+   * @private
+   */
+  _resizeCanvas() {
+    const containerEl = this.container.querySelector('.snake-container');
+    const availableWidth = containerEl ? containerEl.clientWidth : this.wrapper.parentElement.clientWidth;
+    const cellSize = Math.max(10, Math.floor(availableWidth / this.COLS));
+    const canvasSize = cellSize * this.COLS;
+    if (canvasSize === this.canvas.width && cellSize === this.CELL_SIZE) return;
+    this.canvas.width = canvasSize;
+    this.canvas.height = canvasSize;
+    this.CELL_SIZE = cellSize;
+    this._createTiles();
+    if (this.snake) this._draw();
+  }
+
+  /**
+   * Binds focus, blur, overlay-click, and resize event listeners.
    * @private
    */
   _bindEvents() {
@@ -1671,15 +1689,19 @@ class SnakeGame {
     this.canvas.addEventListener('focus', this._onFocus);
     this.canvas.addEventListener('blur', this._onBlur);
     this.overlay.addEventListener('click', this._onClick);
+    this._resizeObserver = new ResizeObserver(() => this._resizeCanvas());
+    this._resizeObserver.observe(this.wrapper);
   }
 
   /**
-   * Removes event listeners and clears all timers. Call before re-mounting.
+   * Removes event listeners, disconnects the resize observer, and clears all
+   * timers. Call before re-mounting.
    */
   destroy() {
     this.canvas.removeEventListener('focus', this._onFocus);
     this.canvas.removeEventListener('blur', this._onBlur);
     this.overlay.removeEventListener('click', this._onClick);
+    this._resizeObserver.disconnect();
     this.input.destroy();
     this._clearAllTimers();
   }
@@ -1975,11 +1997,11 @@ class SnakeGame {
       this.ctx.fillStyle = this.colors.overlay;
       this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
       this.ctx.fillStyle = this.colors.overlayText;
-      this.ctx.font = 'bold 32px Courier New';
+      this.ctx.font = `bold ${Math.max(16, Math.round(this.CELL_SIZE * 1.28))}px Courier New`;
       this.ctx.textAlign = 'center';
       this.ctx.textBaseline = 'middle';
       this.ctx.fillText('GAME OVER', this.canvas.width / 2, this.canvas.height / 2 - 20);
-      this.ctx.font = '24px Courier New';
+      this.ctx.font = `${Math.max(12, Math.round(this.CELL_SIZE * 0.96))}px Courier New`;
       this.ctx.fillText(`Score: ${this.score}`, this.canvas.width / 2, this.canvas.height / 2 + 20);
     }
   }

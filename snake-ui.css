@@ -20,6 +20,7 @@ body {
   height: 100vh;
   font-family: 'Courier New', monospace;
   color: #4a7a4a;
+  overflow-x: hidden;
 }
 .snake-toggles {
   margin-bottom: 12px;
@@ -111,4 +112,11 @@ body.snake-colorblind {
   background: #000000;
   color: #009e73;
   border-color: #009e73;
+}
+@media (max-width: 510px) {
+  .snake-mode-selector,
+  .snake-features-details,
+  .snake-root > hr {
+    display: none;
+  }
 }
