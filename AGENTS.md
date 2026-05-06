@@ -391,3 +391,87 @@ To add a new shape:
 - **Reversal guard**: Player cannot reverse direction in a single tick. `InputManager.commitDirection()` skips opposite directions in buffer processing.
 - **Game over overlay**: Semi-transparent dark overlay with "GAME OVER" (32px bold Courier New) and "Score: X" (24px Courier New) drawn on canvas when `state === 'over'`. Message text below canvas reads "Game Over! Press Space to restart".
 - **Timer display**: `_updateTimerDisplay()` runs every 1000ms via `setInterval`. In classic/constrictor mode, counts up from 0:00. In time-trial mode, counts down from 2:00 (`TIME_LIMIT = 120000`ms) and triggers game over at 0:00.
+
+## Responsive Canvas Sizing
+
+The canvas is **not** fixed at 500×500px — it resizes to fit the viewport via a `ResizeObserver` and JavaScript pixel-calculation logic. The 20×20 grid is maintained; only the pixel density changes.
+
+### Initialization Flow
+
+1. `_buildDOM()` hardcodes the canvas to 500×500 with `CELL_SIZE = 25` as a safe fallback.
+2. `_bindEvents()` creates a `ResizeObserver` on `this.container` (`.snake-game-container`), and queues a `requestAnimationFrame` callback that calls `_resizeCanvas()` after the first paint (when layout is available).
+3. The `ResizeObserver` watches `.snake-game-container` (NOT `.snake-game-wrapper`) because the wrapper is `display: inline-block` sized to its canvas child — observing it creates a chicken-and-egg deadlock where the wrapper size is determined by the canvas, not the viewport.
+
+### `_resizeCanvas()` Logic (`snake.js:1661`)
+
+```
+availableWidth = .snake-container.clientWidth
+if (availableWidth < 20) return    // guard: layout not yet computed
+cellSize = max(10, floor(availableWidth / COLS))
+canvasSize = cellSize * COLS
+if (canvasSize === canvas.width && cellSize === CELL_SIZE) return  // no-op
+canvas.width = canvas.height = canvasSize
+CELL_SIZE = cellSize
+_createTiles()
+if (this.snake) _draw()             // guarded: snake doesn't exist during init
+```
+
+### Key Constraints
+
+| Constraint            | Value         | Reason                                       |
+| --------------------- | ------------- | -------------------------------------------- |
+| `CELL_SIZE` minimum   | 10px          | `Math.max(10, ...)` guard at `snake.js:1667` |
+| Canvas minimum        | 200px         | 10px × 20 cols                               |
+| Wrapper minimum       | 210px         | 200px canvas + 5px border × 2 sides          |
+| Container `max-width` | 510px         | 500px canvas + 10px border at default size   |
+| Viewports < 210px     | Layout broken | Canvas physically can't shrink below 200px   |
+
+### Practical Minimum
+
+According to StatCounter (April 2026), the narrowest popular mobile width is 360px. The oldest iPhone SE (1st gen) has 320px. No mainstream device has a viewport below 210px. The 10px floor is a code-level safety net, not a real-world concern.
+
+## Variable-Size Tile Rendering
+
+Tiles are pre-rendered off-screen canvases that must render correctly across varying `CELL_SIZE` values (25px default, as low as 10px).
+
+### Architecture
+
+- **Tile canvases**: Always **26×26 pixels** (`_makeTile`, `snake.js:2066`). The 19 `TILE_RENDERERS` functions use hardcoded 26px coordinates — tiles are rendered at their native resolution regardless of `CELL_SIZE`.
+- **Main canvas draw**: `ctx.drawImage(tile, x * CELL_SIZE, y * CELL_SIZE, CELL_SIZE, CELL_SIZE)` — scales the 26×26 tile to `CELL_SIZE × CELL_SIZE` destination pixels.
+- **Nearest-neighbor scaling**: `ctx.imageSmoothingEnabled = false` is set in `_draw()` (`snake.js:1941`) before any `drawImage` call. This disables bilinear filtering, preventing anti-aliased blending at tile boundaries that would otherwise create visible "streaks" between adjacent cells.
+
+### Why Not `ctx.scale()` Inside Tiles?
+
+A previous approach used `ctx.scale(CELL_SIZE/26, CELL_SIZE/26)` inside `_makeTile()` to proportionally map renderer coordinates to the actual tile size. This caused:
+
+1. **Non-integer coordinates** — `fillRect(3, 3, 20, 20)` scaled to fractional pixels (e.g., at CELL_SIZE=20: `fillRect(2.31, 2.31, 15.38, 15.38)`).
+2. **Anti-aliased edges within tiles** — fractional coordinates trigger canvas anti-aliasing.
+3. **Visible streaks at seams** — when adjacent tiles are drawn side by side, their anti-aliased edge pixels blend, creating visible lines between cells.
+
+The current approach renders tiles once at 26×26 with clean integer coordinates, then scales the finished tile image via nearest-neighbor. No internal anti-aliasing, no streaks.
+
+### Tradeoff
+
+At smaller `CELL_SIZE` values, nearest-neighbor downscaling from 26px drops pixels (e.g., 26→20 drops 6px). Shapes retain their character but lose fine detail. This is acceptable and standard for pixel-art game rendering.
+
+## Responsive Layout (< 510px)
+
+When the viewport width drops below 510px, the CSS media queries restructure the UI to fit:
+
+### `snake-game.css` — HUD and Game Area
+
+- `.snake-container` becomes a **flex column** so `order` can reposition children.
+- `.snake-game-wrapper` (`order: 0`) stays on top (canvas first).
+- `.snake-hud` (`order: 1`, `flex-direction: column`) moves below the canvas, stacked vertically: Score → Bonus → Time. Font shrinks from 22px to 14px.
+- `.snake-message` is hidden (extra clutter on small screens).
+
+### `snake-ui.css` — Controls and Options
+
+- `.snake-root` gets `width: 100%; padding: 0 12px; box-sizing: border-box` — creates 12px of breathing room on each side.
+- `.snake-toggles` switches from fixed 510px to `width: 100%`.
+- Toggle grid changes from 2 columns to 1 column.
+- All font sizes reduce by ~3-4px.
+- Checkboxes shrink to 16px.
+- The `<hr>` rule switches from fixed 510px to `width: 100%`.
+
+No elements are hidden — everything is restructured to fit (following the web.dev principle of adapting content rather than removing it).
