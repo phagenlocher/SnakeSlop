@@ -50,7 +50,7 @@ Food is eaten by enclosure, not head collision.
 
 ## Togglable Features
 
-All features are controlled via checkboxes in `index.html` and passed as options to `SnakeGame(container, options)`. The game is destroyed and remounted whenever any toggle changes. All features default to `true` (enabled).
+All features are controlled via checkboxes in `index.html` and passed as options to `SnakeGame(container, options)`. The game is destroyed and remounted whenever any toggle changes. All features default to `true` (enabled), **except `enableColorblindMode` which defaults to `false`**.
 
 ### Bonuses and Score
 
@@ -60,7 +60,7 @@ Enables the golden diamond bonus food mechanic.
 
 - **Appearance**: A golden diamond (`#FFD700`) rendered on the canvas, distinct from the regular red food (`#ff4444`).
 - **Spawn trigger**: Appears every 15 seconds via a time-based trigger (`enableTimedBonusFood`), but only if no bonus food is already on the board.
-- **Placement**: Random grid position, avoiding both snake body and regular food.
+- **Placement**: Random grid position, avoiding snake body, regular food, and wall cells.
 - **Movement**: Moves randomly in one of four cardinal directions at intervals of `currentSpeed + 60`ms via `setInterval`. Respects `enableWrap` for boundary behavior.
 - **Expiration**: Auto-removes after 5 seconds via `setTimeout`.
 - **Points**: Worth 100 points when eaten.
@@ -94,7 +94,7 @@ Enables a decaying bonus score multiplier displayed in the HUD as `Bonus: N`.
 - **Reset**: After eating regular food, bonus value resets to 100 and a new decay interval starts.
 - **HUD**: Shown as `<span class="snake-bonus">Bonus: 100</span>` in the HUD bar between Score and Time.
 - **Pause/resume**: Decay timer is cleared on pause and restarted on resume (remaining decay continues from where it left off, but the value itself is not adjusted for elapsed pause time).
-- **When disabled**: No bonus score is ever added; the bonus HUD element still renders but shows a static initial value; decay interval never starts.
+- **When disabled**: No bonus score is ever added; the bonus HUD element is **not rendered at all** (`getHUDHtml()` returns `''`); decay interval never starts.
 
 ### Movement and Speed
 
@@ -191,7 +191,7 @@ Enables a teleport mechanic with a wormhole entry/exit pair.
 - **Lifetime**: Wormholes auto-despawn after 15 seconds via `setTimeout`, or immediately when the snake enters the entry cell.
 - **Placement**: Entry and exit avoid snake body, regular food, bonus food, and wall cells.
 - **Teleport**: When the snake's head enters the entry cell, it instantly appears at the exit cell, continuing in the same direction. Both wormholes are consumed and the lifetime timeout is cancelled.
-- **White cell**: Light square with no mechanical effect — the snake moves through it freely.
+- **Exit cell**: Off-white square (`#e8e8e8`) with no mechanical effect — the snake moves through it freely.
 - **Collision**: If the teleport destination (exit cell) is blocked by the snake's body, normal collision rules apply (grace period or game over).
 - **Appearance**: `#003a00` (dark green) for entry, `#e8e8e8` (off-white) for exit. Drawn after walls, before snake.
 - **Constrictor**: Wormhole cells do not block flood-fill enclosure checks. Teleport fires before constrictor-specific head-food logic.
@@ -229,13 +229,12 @@ Snake segments are rendered using pre-rendered off-screen canvas tiles instead o
 
 - **Concept**: At game init, 51 off-screen `<canvas>` elements (26×26px each) are created and stored in `this.tiles`. Each frame, the appropriate tile is drawn onto the main canvas via `drawImage()`.
 - **Performance**: Reduces per-frame drawing from dozens of `fillRect` calls to a single `drawImage` per segment/entity.
-- **Location**: `snake.js:106-137` (theme objects), `snake.js:193-350` (TILE_RENDERERS), `snake.js:353` (STATIC_TILE_KEYS), `snake.js:1982-2003` (tile creation), `snake.js:1928-1944` (draw-time lookup + drawImage).
 
-### Color Themes (`snake.js:106-137`)
+### Color Themes
 
 Two color theme objects define all visual colors — static element colors, palettes for snake segments, and UI colors. At construction, `this.colors` is bound to the active theme. All rendering code reads from `this.colors.*`.
 
-`THEME_DEFAULT` (lines 107–125):
+`THEME_DEFAULT`:
 | Key | Value | Usage |
 | --- | ----- | ----- |
 | `bg` | `#0d1a0d` | Canvas background |
@@ -253,7 +252,7 @@ Two color theme objects define all visual colors — static element colors, pale
 | `paletteIgnored` | `{ body:#c084fc, head:#e2ccff, eye:#4a0060 }` | Constrictor ignored |
 | `paletteBoost` | `{ body:#4a7a4a, head:#f0e68c, eye:#0d1a0d }` | Speed boost (head only) |
 
-`THEME_COLORBLIND` (lines 127–137) follows the same structure with Bang Wong colorblind-friendly values (doi:10.1038/nmeth.1618).
+`THEME_COLORBLIND` follows the same structure with Bang Wong colorblind-friendly values (doi:10.1038/nmeth.1618).
 
 ### Palettes
 
@@ -266,35 +265,35 @@ Each palette has `body`, `head`, and `eye` properties, accessed via `this.colors
 | `paletteIgnored` | `'_i'` | Constrictor self-collision |
 | `paletteBoost`   | `'_b'` | Speed boost (head only)    |
 
-### Segment Shapes (`TILE_RENDERERS`, `snake.js:193-350`)
+### Segment Shapes (`TILE_RENDERERS`)
 
 19 drawing functions, each receiving `(ctx, palette)` for snake shapes or `(ctx, _p, theme)` for static shapes and drawing on a 26×26 canvas:
 
-| Key             | Lines   | Shape                                              |
-| --------------- | ------- | -------------------------------------------------- |
-| `headUp`        | 194-202 | Head facing up, two eyes near top edge             |
-| `headDown`      | 203-211 | Head facing down, two eyes near bottom edge        |
-| `headLeft`      | 212-220 | Head facing left, two eyes near left edge          |
-| `headRight`     | 221-229 | Head facing right, two eyes near right edge        |
-| `bodyHoriz`     | 230-232 | Solid filled rectangle (horizontal segment)        |
-| `bodyVert`      | 234-236 | Solid filled rectangle (vertical segment)          |
-| `tailUp`        | 238-243 | Rounded tail pointing up (arc-based semicircle)    |
-| `tailDown`      | 245-250 | Rounded tail pointing down (arc-based semicircle)  |
-| `tailLeft`      | 252-257 | Rounded tail pointing left (arc-based semicircle)  |
-| `tailRight`     | 259-264 | Rounded tail pointing right (arc-based semicircle) |
-| `cornerRD`      | 266-276 | Right→down corner (arc in top-left quadrant)       |
-| `cornerLD`      | 277-287 | Left→down corner (arc in top-right quadrant)       |
-| `cornerRU`      | 288-298 | Right→up corner (arc in bottom-left quadrant)      |
-| `cornerLU`      | 299-309 | Left→up corner (arc in bottom-right quadrant)      |
-| `wall`          | 310-318 | 3D beveled wall block (static tile, uses theme)    |
-| `food`          | 320-327 | Red circle (static tile, uses theme)               |
-| `bonusFood`     | 329-340 | Golden diamond (static tile, uses theme)           |
-| `wormholeEntry` | 342-344 | Dark green filled square (static tile, uses theme) |
-| `wormholeExit`  | 346-348 | Off-white filled square (static tile, uses theme)  |
+| Key             | Shape                                              |
+| --------------- | -------------------------------------------------- |
+| `headUp`        | Head facing up, two eyes near top edge             |
+| `headDown`      | Head facing down, two eyes near bottom edge        |
+| `headLeft`      | Head facing left, two eyes near left edge          |
+| `headRight`     | Head facing right, two eyes near right edge        |
+| `bodyHoriz`     | Solid filled rectangle (horizontal segment)        |
+| `bodyVert`      | Solid filled rectangle (vertical segment)          |
+| `tailUp`        | Rounded tail pointing up (arc-based semicircle)    |
+| `tailDown`      | Rounded tail pointing down (arc-based semicircle)  |
+| `tailLeft`      | Rounded tail pointing left (arc-based semicircle)  |
+| `tailRight`     | Rounded tail pointing right (arc-based semicircle) |
+| `cornerRD`      | Right→down corner (arc in top-left quadrant)       |
+| `cornerLD`      | Left→down corner (arc in top-right quadrant)       |
+| `cornerRU`      | Right→up corner (arc in bottom-left quadrant)      |
+| `cornerLU`      | Left→up corner (arc in bottom-right quadrant)      |
+| `wall`          | 3D beveled wall block (static tile, uses theme)    |
+| `food`          | Red circle (static tile, uses theme)               |
+| `bonusFood`     | Golden diamond (static tile, uses theme)           |
+| `wormholeEntry` | Dark green filled square (static tile, uses theme) |
+| `wormholeExit`  | Off-white filled square (static tile, uses theme)  |
 
-### Tile Creation (`_createTiles`, `snake.js:1982-2003`)
+### Tile Creation (`_createTiles`)
 
-Called during `init()`. Creates 51 tiles total:
+Called during `_buildDOM()` and `_resizeCanvas()` (NOT during `init()`). Creates 51 tiles total:
 
 1. **3 full sets** (14 snake shapes × 3 palettes = 42): Normal (`''`), Warning (`'_w'`), Ignored (`'_i'`)
 2. **4 boost heads** (head shapes × boost palette = 4): `headUp_b`, `headDown_b`, `headLeft_b`, `headRight_b`
@@ -302,18 +301,18 @@ Called during `init()`. Creates 51 tiles total:
 
 Helper methods:
 
-- `_createTileSet(palette, suffix)` (`snake.js:2012-2019`) — creates 14 tiles for one palette, skipping static keys, returns `{key: canvas}` object
-- `_makeTile(key, palette)` (`snake.js:2028-2035`) — creates a single 26×26 off-screen canvas, calls `TILE_RENDERERS[key](ctx, palette)`, returns the canvas
+- `_createTileSet(palette, suffix)` — creates 14 tiles for one palette, skipping static keys, returns `{key: canvas}` object
+- `_makeTile(key, palette)` — creates a single 26×26 off-screen canvas, calls `TILE_RENDERERS[key](ctx, palette)`, returns the canvas
 
-### Tile Selection at Draw Time (`_draw`, `snake.js:1901-1975`)
+### Tile Selection at Draw Time (`_draw`)
 
-Walls, wormholes, food, and bonus food are drawn via their static tile keys. For snake segments (`snake.js:1928-1944`):
+Walls, wormholes, food, and bonus food are drawn via their static tile keys. For snake segments:
 
 1. `_getSegmentTileKey(i)` determines the base shape key (e.g., `headUp`, `bodyHoriz`, `cornerLD`)
 2. State suffix is appended: `_b` (boost head), `_i` (ignored), `_w` (warning), or `''` (normal)
 3. `this.ctx.drawImage(this.tiles[key], x, y, CELL_SIZE, CELL_SIZE)` draws the pre-rendered tile
 
-### Segment Key Resolution (`_getSegmentTileKey`, `snake.js:2044-2077`)
+### Segment Key Resolution (`_getSegmentTileKey`)
 
 Determines which shape to use for segment index `i`:
 
@@ -325,7 +324,7 @@ Determines which shape to use for segment index `i`:
   - Non-cardinal directions → falls back to `bodyHoriz`/`bodyVert`
 - **Wrap-aware**: `BoundaryManager.dirBetween()` uses `enableWrap` option to handle wrap-around adjacency
 
-### Direction & Corner Maps (`snake.js:164-181`)
+### Direction & Corner Maps
 
 ```js
 // Direction offset → name
@@ -362,24 +361,24 @@ To add a new shape:
   - `snake-game.css` — game canvas, HUD, overlay, and message styles
 - **SnakeGame class** with `constructor(container, options)`, `init()`, `destroy()`, `_buildDOM()`, `_bindEvents()`
 - **Manager classes** (all in `snake.js`):
-  - `TimerManager` (`snake.js:359-420`) — named timers (intervals and timeouts) with clear-by-name semantics and bulk clear
-  - `SnakeBody` (`snake.js:428-529`) — ordered segment array with O(1) position lookup set
-  - `WallsManager` (`snake.js:535-572`) — static wall layout, collision checks, wall-set queries
-  - `BoundaryManager` (`snake.js:579-625`) — wrap vs. solid boundaries, coordinate wrapping, wrap-aware direction computation
-  - `WormholesManager` (`snake.js:632-725`) — wormhole spawn/lifetime timers, teleportation, rendering
-  - `BonusFoodManager` (`snake.js:733-954`) — bonus food spawn (timed or count-based), movement, collision, eating
-  - `ScoreBonusManager` (`snake.js:962-1021`) — decaying bonus multiplier, HUD display
-  - `SpeedManager` (`snake.js:1028-1061`) — game-speed acceleration from food eaten
-  - `InputManager` (`snake.js:1068-1338`) — direction buffering, speed boost, instant movement, touch/swipe input
-  - `CollisionResolver` (`snake.js:1345-1460`) — collision detection, grace period, ignored state routing
+  - `TimerManager` — named timers (intervals and timeouts) with clear-by-name semantics and bulk clear
+  - `SnakeBody` — ordered segment array with O(1) position lookup set
+  - `WallsManager` — static wall layout, collision checks, wall-set queries
+  - `BoundaryManager` — wrap vs. solid boundaries, coordinate wrapping, wrap-aware direction computation
+  - `WormholesManager` — wormhole spawn/lifetime timers, teleportation, rendering
+  - `BonusFoodManager` — bonus food spawn (timed or count-based), movement, collision, eating
+  - `ScoreBonusManager` — decaying bonus multiplier, HUD display
+  - `SpeedManager` — game-speed acceleration from food eaten
+  - `InputManager` — direction buffering, speed boost, instant movement, touch/swipe input
+  - `CollisionResolver` — collision detection, grace period, ignored state routing
 - **Options**: `mode` (`'classic'`, `'timeTrial'`, or `'constrictor'`), `enableBonusFood`, `enableGracePeriod`, `enableShrinkOnBonusFood`, `enableSpeedUp`, `enableScoreBonus`, `enableWrap`, `enableSpeedBoost`, `enableInputBuffer`, `enableInstantMovement`, `enableTimedBonusFood`, `enableWalls`, `enableWormholes`, `enableColorblindMode` — toggled via UI; game remounts on change
 - **Canvas**: 500×500px, grid size `COLS=20, ROWS=20`, cell size `CELL_SIZE=25`px
 - **HUD**: Score display + bonus score + timer (`Time: M:SS`)
-- **State machine** (`snake.js:89-104`): `waiting` → `playing` → `warning`/`ignored` → `over` (Space restarts to `waiting`); transitions validated via `STATE_TRANSITIONS`
-- **Game loop**: Recursive `setTimeout` via `_scheduleNextTick()` (`snake.js:2194-2206`) — each tick calls `_update()` then reschedules if still playing. Interval adjusted for speed boost (`currentSpeed / 1.35` when active).
-- **Tick pipeline** (`_update`, `snake.js:2173-2187`): `commitDirection` → `resolveNextHead` (compute head position, wrap, wormhole teleport) → `processCollision` (check wall/boundary/self, route to warning/ignored/over) → `unshift` new head → mode-specific turn logic (`_processClassicTurn` or `_processConstrictorTurn`) → `_draw()`
+- **State machine**: `waiting` → `playing` → `warning`/`ignored` → `over` (Space restarts to `waiting`); transitions validated via `STATE_TRANSITIONS`
+- **Game loop**: Recursive `setTimeout` via `_scheduleNextTick()` — each tick calls `_update()` then reschedules if still playing. Interval adjusted for speed boost (`currentSpeed / 1.35` when active).
+- **Tick pipeline** (`_update`): `commitDirection` → `resolveNextHead` (compute head position, wrap, wormhole teleport) → `processCollision` (check wall/boundary/self, route to warning/ignored/over) → `unshift` new head → mode-specific turn logic (`_processClassicTurn` or `_processConstrictorTurn`) → `_draw()`
 - **Input**: Arrow keys and touch swipes routed through `InputManager`; Space restarts from `over` state
-- **Touch support** (`snake.js:1188-1227`): Swipe detection with 30px threshold; prevents page scrolling during gameplay
+- **Touch support**: Swipe detection with 30px threshold; prevents page scrolling during gameplay
 - **Settings persistence**: All toggle states and mode selection saved to `localStorage` under key `snake-game-settings` on every mount; restored from storage on page load
 - **Warning state**: 700ms grace period before game over when about to collide; player can dodge with a safe arrow key (grace period only active when `enableGracePeriod` is on)
 - **Snake data**: `SnakeBody` instance wrapping an array of `{x, y}` — `unshift` head, `pop` tail (skip pop when eating food). O(1) occupancy checks via `has(x, y)`.
@@ -389,7 +388,7 @@ To add a new shape:
 - **Bonus food**: Golden diamond, appears every 15 seconds (timed mode) or every 5 foods eaten (count mode), worth 100pts, moves randomly at `(currentSpeed + 60)`ms intervals, expires after 5s. Eating bonus food by head (classic/time-trial) or enclosure (constrictor) awards points and optionally shrinks snake by half via `SnakeBody.splice(Math.ceil(length / 2))` (minimum length 15 in constrictor mode).
 - **Pause/Resume**: Canvas `focus`/`blur` events with a `snake-focus-overlay` div; all timers cleared on pause, restored on resume with remaining time recalculated. Supports paused recovery in `playing`, `warning`, and `ignored` states.
 - **Reversal guard**: Player cannot reverse direction in a single tick. `InputManager.commitDirection()` skips opposite directions in buffer processing.
-- **Game over overlay**: Semi-transparent dark overlay with "GAME OVER" (32px bold Courier New) and "Score: X" (24px Courier New) drawn on canvas when `state === 'over'`. Message text below canvas reads "Game Over! Press Space to restart".
+- **Game over overlay**: Semi-transparent dark overlay with "GAME OVER" (font size `CELL_SIZE * 1.28`, bold Courier New) and "Score: X" (font size `CELL_SIZE * 0.96`, Courier New) drawn on canvas when `state === 'over'`. Message text below canvas reads "Game Over! Press Space or tap to restart".
 - **Timer display**: `_updateTimerDisplay()` runs every 1000ms via `setInterval`. In classic/constrictor mode, counts up from 0:00. In time-trial mode, counts down from 2:00 (`TIME_LIMIT = 120000`ms) and triggers game over at 0:00.
 
 ## Responsive Canvas Sizing
@@ -402,7 +401,7 @@ The canvas is **not** fixed at 500×500px — it resizes to fit the viewport via
 2. `_bindEvents()` creates a `ResizeObserver` on `this.container` (`.snake-game-container`), and queues a `requestAnimationFrame` callback that calls `_resizeCanvas()` after the first paint (when layout is available).
 3. The `ResizeObserver` watches `.snake-game-container` (NOT `.snake-game-wrapper`) because the wrapper is `display: inline-block` sized to its canvas child — observing it creates a chicken-and-egg deadlock where the wrapper size is determined by the canvas, not the viewport.
 
-### `_resizeCanvas()` Logic (`snake.js:1661`)
+### `_resizeCanvas()` Logic
 
 ```
 availableWidth = .snake-container.clientWidth
@@ -418,13 +417,13 @@ if (this.snake) _draw()             // guarded: snake doesn't exist during init
 
 ### Key Constraints
 
-| Constraint            | Value         | Reason                                       |
-| --------------------- | ------------- | -------------------------------------------- |
-| `CELL_SIZE` minimum   | 10px          | `Math.max(10, ...)` guard at `snake.js:1667` |
-| Canvas minimum        | 200px         | 10px × 20 cols                               |
-| Wrapper minimum       | 210px         | 200px canvas + 5px border × 2 sides          |
-| Container `max-width` | 510px         | 500px canvas + 10px border at default size   |
-| Viewports < 210px     | Layout broken | Canvas physically can't shrink below 200px   |
+| Constraint            | Value         | Reason                                     |
+| --------------------- | ------------- | ------------------------------------------ |
+| `CELL_SIZE` minimum   | 10px          | `Math.max(10, ...)` guard                  |
+| Canvas minimum        | 200px         | 10px × 20 cols                             |
+| Wrapper minimum       | 210px         | 200px canvas + 5px border × 2 sides        |
+| Container `max-width` | 510px         | 500px canvas + 10px border at default size |
+| Viewports < 210px     | Layout broken | Canvas physically can't shrink below 200px |
 
 ### Practical Minimum
 
@@ -436,7 +435,7 @@ Tiles are pre-rendered off-screen canvases that must render correctly across var
 
 ### Architecture
 
-- **Tile canvases**: Always **26×26 pixels** (`_makeTile`, `snake.js:2066`). The 19 `TILE_RENDERERS` functions use hardcoded 26px coordinates — tiles are rendered at their native resolution regardless of `CELL_SIZE`.
+- **Tile canvases**: Always **26×26 pixels** (`_makeTile`). The 19 `TILE_RENDERERS` functions use hardcoded 26px coordinates — tiles are rendered at their native resolution regardless of `CELL_SIZE`.
 - **Main canvas draw**: `ctx.drawImage(tile, x * CELL_SIZE, y * CELL_SIZE, CELL_SIZE, CELL_SIZE)` — scales the 26×26 tile to `CELL_SIZE × CELL_SIZE` destination pixels with default bilinear filtering. Because tiles are rendered at 26×26 with clean integer coordinates (no internal anti-aliasing), bilinear interpolation at tile boundaries produces smooth results without visible streaks.
 - **No `imageSmoothingEnabled` override**: The default `true` (bilinear) is used. It was briefly set to `false` (nearest-neighbor) to work around a separate `ctx.scale()` issue, but that was reversed once the root cause was fixed.
 
@@ -463,7 +462,7 @@ When the viewport width drops below 510px, the CSS media queries restructure the
 - `.snake-container` becomes a **flex column** so `order` can reposition children.
 - `.snake-game-wrapper` (`order: 0`) stays on top (canvas first).
 - `.snake-hud` (`order: 1`, `flex-direction: column`) moves below the canvas, stacked vertically: Score → Bonus → Time. Font shrinks from 22px to 14px.
-- `.snake-message` is hidden (extra clutter on small screens).
+- `.snake-message` is hidden (`display: none`) on small screens.
 
 ### `snake-ui.css` — Controls and Options
 
@@ -473,5 +472,3 @@ When the viewport width drops below 510px, the CSS media queries restructure the
 - All font sizes reduce by ~3-4px.
 - Checkboxes shrink to 16px.
 - The `<hr>` rule switches from fixed 510px to `width: 100%`.
-
-No elements are hidden — everything is restructured to fit (following the web.dev principle of adapting content rather than removing it).
