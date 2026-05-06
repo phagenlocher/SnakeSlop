@@ -112,7 +112,7 @@ const COLOR_WALL_EDGE_LIGHT = '#777';
 /** @const {string} Wall bottom/right edge shadow. */
 const COLOR_WALL_EDGE_DARK = '#333';
 /** @const {string} Regular food color. */
-const COLOR_FOOD = '#7aff7a';
+const COLOR_FOOD = '#ff4444';
 /** @const {string} Bonus food (golden diamond) color. */
 const COLOR_FOOD_BONUS = '#ffd700';
 /** @const {string} Wormhole entry cell color. */
@@ -318,8 +318,13 @@ const TILE_RENDERERS = {
     ctx.fillRect(0, 25, 26, 1);
   },
   food(ctx) {
+    const cx = 13;
+    const cy = 13;
+    const r = 10;
     ctx.fillStyle = COLOR_FOOD;
-    ctx.fillRect(1, 1, 23, 23);
+    ctx.beginPath();
+    ctx.arc(cx, cy, r, 0, Math.PI * 2);
+    ctx.fill();
   },
   bonusFood(ctx) {
     const cx = 13;
