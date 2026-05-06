@@ -1130,11 +1130,13 @@ class InputManager {
     this._boundTouchStart = this._onTouchStart.bind(this);
     this._boundTouchMove = this._onTouchMove.bind(this);
     this._boundTouchEnd = this._onTouchEnd.bind(this);
+    this._boundCanvasClick = this._onCanvasClick.bind(this);
 
     this._canvas.addEventListener('keydown', this._boundKeydown);
     this._wrapper.addEventListener('touchstart', this._boundTouchStart, { passive: false });
     this._wrapper.addEventListener('touchmove', this._boundTouchMove, { passive: false });
     this._wrapper.addEventListener('touchend', this._boundTouchEnd, { passive: false });
+    this._canvas.addEventListener('click', this._boundCanvasClick);
   }
 
   /**
@@ -1143,6 +1145,7 @@ class InputManager {
   destroy() {
     if (this._canvas) {
       this._canvas.removeEventListener('keydown', this._boundKeydown);
+      this._canvas.removeEventListener('click', this._boundCanvasClick);
     }
     if (this._wrapper) {
       this._wrapper.removeEventListener('touchstart', this._boundTouchStart);
@@ -1183,6 +1186,17 @@ class InputManager {
   }
 
   /**
+   * Handles canvas click/tap events. Restarts the game when in the OVER state,
+   * providing a mobile-friendly alternative to the spacebar.
+   * @private
+   */
+  _onCanvasClick() {
+    if (this._getState() === STATE.OVER) {
+      this._onRestart();
+    }
+  }
+
+  /**
    * Minimum pixel distance a touch must travel to register as a swipe.
    * @private
    * @returns {number}
@@ -1197,6 +1211,7 @@ class InputManager {
    * @param {TouchEvent} e
    */
   _onTouchStart(e) {
+    if (this._getState() === STATE.OVER) return;
     if (this._getState() !== STATE.WAITING) {
       e.preventDefault();
     }
@@ -1212,6 +1227,7 @@ class InputManager {
    * @param {TouchEvent} e
    */
   _onTouchMove(e) {
+    if (this._getState() === STATE.OVER) return;
     e.preventDefault();
   }
 
@@ -1688,7 +1704,10 @@ class SnakeGame {
       this.overlay.classList.remove('snake-hidden');
       this._pauseGame();
     };
-    this._onClick = () => this.canvas.focus();
+    this._onClick = () => {
+      this.canvas.focus();
+      if (this.state === STATE.OVER) this.init();
+    };
 
     this.canvas.addEventListener('focus', this._onFocus);
     this.canvas.addEventListener('blur', this._onBlur);
@@ -2326,7 +2345,7 @@ class SnakeGame {
   _gameOver() {
     this._clearAllTimers();
     this._transitionTo(STATE.OVER);
-    this.messageElement.textContent = 'Game Over! Press Space to restart';
+    this.messageElement.textContent = 'Game Over! Press Space or tap to restart';
     this._draw();
   }
 
