@@ -1660,9 +1660,10 @@ class SnakeGame {
     const floodSize = (sx, sy, visited) => {
       let size = 0;
       const q = [{ x: sx, y: sy }];
+      let head = 0;
       visited.add(key(sx, sy));
-      while (q.length) {
-        const { x, y } = q.shift();
+      while (head < q.length) {
+        const { x, y } = q[head++];
         size++;
         for (const [dx, dy] of [
           [0, 1],
