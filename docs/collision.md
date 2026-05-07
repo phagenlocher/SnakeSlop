@@ -28,7 +28,7 @@ When disabled, any collision triggers immediate game over.
 In constrictor mode, self-collision routes to the `ignored` state instead of triggering warning or game over:
 
 1. Snake freezes and turns magenta (ignored palette)
-2. All timers (game loop, bonus food, score decay) are cleared
+2. The rAF loop is stopped and all timers (bonus food, score decay) are cleared
 3. The prompt "Snake stuck — press a safe direction" appears
 4. If a safe direction exists and the player presses it, the game resumes
 5. If **no** safe direction exists (all four adjacent cells are blocked), game over is triggered immediately via `hasAnySafeMove()`

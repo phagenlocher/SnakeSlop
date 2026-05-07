@@ -32,6 +32,6 @@ Pressing the same arrow key as the current direction activates a 1.35× speed mu
 
 ## Instant Movement (`enableInstantMovement`)
 
-When enabled, a valid direction keypress triggers an immediate `_update()` call, and the game loop is rescheduled. This makes the snake move instantly rather than waiting for the next tick. Opposite-direction presses are ignored entirely.
+When enabled, a valid direction keypress triggers an immediate `_update()` call, and the rAF loop's accumulator is reset. This makes the snake move instantly rather than waiting for the next tick. Opposite-direction presses are ignored entirely.
 
 When both buffering and instant movement are enabled, each keypress pushes to the buffer then triggers an immediate tick that consumes one buffer entry.

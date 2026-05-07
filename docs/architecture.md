@@ -17,7 +17,7 @@ The entire game lives in a single file (`snake.js`) separated into two layers:
 | `WormholesManager`  | Teleport pair spawning, lifetime, and rendering                                  |
 | `BonusFoodManager`  | Golden diamond spawn, random movement, collision, and eating                     |
 | `ScoreBonusManager` | Decaying bonus multiplier (100→0) and HUD display                                |
-| `SpeedManager`      | Tick-rate acceleration from food eaten                                           |
+| `SpeedManager`      | Tick-rate acceleration from food eaten (no longer restarts the loop)             |
 | `InputManager`      | Direction buffering, speed boost, instant movement, touch/swipe                  |
 | `CollisionResolver` | Collision detection, grace period routing, ignored-state routing                 |
 

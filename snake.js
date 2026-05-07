@@ -1048,15 +1048,13 @@ class ScoreBonusManager {
  */
 class SpeedManager {
   /**
-   * @param {{ enabled: boolean, baseSpeed: number, minSpeed: number, rateStep: number, timers: TimerManager, scheduleNextTick: () => void }} deps
+   * @param {{ enabled: boolean, baseSpeed: number, minSpeed: number, rateStep: number }} deps
    */
-  constructor({ enabled, baseSpeed, minSpeed, rateStep, timers, scheduleNextTick }) {
+  constructor({ enabled, baseSpeed, minSpeed, rateStep }) {
     this._enabled = enabled;
     this._baseSpeed = baseSpeed;
     this._minSpeed = minSpeed;
     this._rateStep = rateStep;
-    this._timers = timers;
-    this._scheduleNextTick = scheduleNextTick;
     /** @type {number} Current game loop interval in ms. */
     this.currentSpeed = baseSpeed;
   }
@@ -1071,14 +1069,10 @@ class SpeedManager {
     const baseTickRate = 1000 / this._baseSpeed;
     const tickRate = baseTickRate + this._rateStep * foodsEaten;
     this.currentSpeed = Math.max(this._minSpeed, 1000 / tickRate);
-    this.restartGameLoop();
   }
 
-  /** Clears the current game loop and schedules the next tick. */
-  restartGameLoop() {
-    this._timers.clear('gameLoop');
-    this._scheduleNextTick();
-  }
+  /** No-op: the rAF-based game loop reads currentSpeed on each frame. */
+  restartGameLoop() {}
 }
 
 /**
@@ -1095,7 +1089,7 @@ class InputManager {
    *   isDirSafe: (dir: Point) => boolean,
    *   getState: () => string,
    *   onUpdate: () => void,
-   *   scheduleNextTick: () => void,
+   *   resetLoopTimer: () => void,
    *   onDirection: (dir: Point) => void,
    *   onRestart: () => void,
    * }} deps
@@ -1107,7 +1101,7 @@ class InputManager {
     isDirSafe,
     getState,
     onUpdate,
-    scheduleNextTick,
+    resetLoopTimer,
     onDirection,
     onRestart,
   }) {
@@ -1117,7 +1111,7 @@ class InputManager {
     this._isDirSafe = isDirSafe;
     this._getState = getState;
     this._onUpdate = onUpdate;
-    this._scheduleNextTick = scheduleNextTick;
+    this._resetLoopTimer = resetLoopTimer;
     this._onDirection = onDirection;
     this._onRestart = onRestart;
     /** @type {Point[]} Buffered direction inputs (max 2). */
@@ -1338,7 +1332,7 @@ class InputManager {
       if (this._enableInstant) {
         this._onUpdate();
         if (this._getState() === STATE.PLAYING) {
-          this._scheduleNextTick();
+          this._resetLoopTimer();
         }
       }
     }
@@ -1572,6 +1566,9 @@ class SnakeGame {
     /** @type {TimerManager} */
     this.timers = new TimerManager();
 
+    /** @private */ this._rafId = undefined;
+    /** @private */ this._lastFrameTime = 0;
+
     /** @type {WormholesManager} */
     this.wormholes = new WormholesManager({
       enabled: this.options.enableWormholes,
@@ -1621,7 +1618,9 @@ class SnakeGame {
       isDirSafe: (dir) => this.collision.isDirSafe(dir),
       getState: () => this.state,
       onUpdate: () => this._update(),
-      scheduleNextTick: () => this._scheduleNextTick(),
+      resetLoopTimer: () => {
+        this._lastFrameTime = performance.now();
+      },
       onDirection: (dir) => this._handleDirectionInput(dir),
       onRestart: () => this.init(),
     });
@@ -1631,8 +1630,6 @@ class SnakeGame {
       baseSpeed: this.BASE_SPEED,
       minSpeed: this.MIN_SPEED,
       rateStep: this.RATE_STEP,
-      timers: this.timers,
-      scheduleNextTick: () => this._scheduleNextTick(),
     });
     /** @type {CollisionResolver} */
     this.collision = new CollisionResolver({
@@ -1742,6 +1739,7 @@ class SnakeGame {
     this.overlay.removeEventListener('click', this._onClick);
     this._resizeObserver.disconnect();
     this.input.destroy();
+    this._stopLoop();
     this._clearAllTimers();
   }
 
@@ -1774,6 +1772,7 @@ class SnakeGame {
     this.warningElapsed = 0;
     this.wormholes.entry = null;
     this.wormholes.exit = null;
+    this._stopLoop();
     this.timers.clearAll();
     this.freeTiles = this.COLS * this.ROWS;
     if (this.walls.enabled) {
@@ -2254,27 +2253,47 @@ class SnakeGame {
     } else {
       this._processClassicTurn(nextHead);
     }
-    if (this.state === STATE.OVER) return;
+  }
+
+  /**
+   * rAF callback. Runs physics when the accumulator reaches the target
+   * interval, then always renders at the display refresh rate.
+   * @private
+   * @param {number} now High-resolution timestamp from requestAnimationFrame.
+   */
+  _runLoop(now) {
+    if (this.state !== STATE.PLAYING) return;
+    this._rafId = requestAnimationFrame((t) => this._runLoop(t));
+    const delta = now - this._lastFrameTime;
+    const targetInterval = this.input.speedBoostActive
+      ? this.speed.currentSpeed / SPEED_BOOST_FACTOR
+      : this.speed.currentSpeed;
+    if (delta >= targetInterval) {
+      this._update();
+      this._lastFrameTime = now - (delta % targetInterval);
+    }
     this._draw();
   }
 
   /**
-   * Schedules the next game tick via a recursive setTimeout.
-   * Adjusts the delay for speed boost if active.
+   * Starts the rAF-based game loop.
+   * @private
+   * @param {number} [now] Optional initial timestamp (defaults to performance.now()).
+   */
+  _startLoop(now) {
+    this._lastFrameTime = now || performance.now();
+    this._rafId = requestAnimationFrame((t) => this._runLoop(t));
+  }
+
+  /**
+   * Stops the rAF-based game loop.
    * @private
    */
-  _scheduleNextTick() {
-    const delay = this.input.speedBoostActive ? this.speed.currentSpeed / SPEED_BOOST_FACTOR : this.speed.currentSpeed;
-    this.timers.setTimeout(
-      'gameLoop',
-      () => {
-        this._update();
-        if (this.state === STATE.PLAYING) {
-          this._scheduleNextTick();
-        }
-      },
-      delay
-    );
+  _stopLoop() {
+    if (this._rafId !== undefined) {
+      cancelAnimationFrame(this._rafId);
+      this._rafId = undefined;
+    }
   }
 
   /**
@@ -2300,7 +2319,7 @@ class SnakeGame {
    * @private
    */
   _enterWarning() {
-    this.timers.clear('gameLoop');
+    this._stopLoop();
     this.bonusFood.clearMovementInterval();
     this._transitionTo(STATE.WARNING);
     this.warningStart = Date.now();
@@ -2322,7 +2341,7 @@ class SnakeGame {
    * @private
    */
   _enterIgnored() {
-    this.timers.clear('gameLoop');
+    this._stopLoop();
     this.bonusFood.clearAllTimers();
     this.scoreBonus.clearTimers();
     this.input.resetBoost();
@@ -2346,7 +2365,7 @@ class SnakeGame {
     if (this.options.mode === MODE_CONSTRICTOR) {
       this.startGrowth = 14;
     }
-    this.speed.restartGameLoop();
+    this._startLoop(performance.now());
     this.timers.setInterval('timerInterval', () => this._updateTimerDisplay(), 1000);
     this.scoreBonus.resumeDecay();
     this.bonusFood.startTimers();
@@ -2359,6 +2378,7 @@ class SnakeGame {
    * @private
    */
   _gameOver() {
+    this._stopLoop();
     this._clearAllTimers();
     this._transitionTo(STATE.OVER);
     this.messageElement.textContent = MSG_GAME_OVER_RESTART;
@@ -2373,6 +2393,7 @@ class SnakeGame {
   _pauseGame() {
     if (this.state !== STATE.PLAYING && this.state !== STATE.WARNING && this.state !== STATE.IGNORED) return;
     this.wasPaused = true;
+    this._stopLoop();
     this._clearAllTimers();
     if (this.state === STATE.WARNING) {
       this.warningElapsed = Date.now() - this.warningStart;
@@ -2390,7 +2411,7 @@ class SnakeGame {
     this.wasPaused = false;
     if (this.state === STATE.PLAYING) {
       this.startTime = Date.now() - this.elapsed;
-      this.speed.restartGameLoop();
+      this._startLoop(performance.now());
       this.timers.setInterval('timerInterval', () => this._updateTimerDisplay(), 1000);
       this._resumeCommonTimers();
       this.bonusFood.startTimers();
@@ -2476,7 +2497,7 @@ class SnakeGame {
     this._transitionTo(STATE.PLAYING);
     this.messageElement.textContent = '';
     this.input.resetBoost();
-    this._scheduleNextTick();
+    this._startLoop(performance.now());
     this.bonusFood.resumeMovementTimers();
   }
 
@@ -2495,7 +2516,7 @@ class SnakeGame {
     this.input.nextDirection = dir;
     this._transitionTo(STATE.PLAYING);
     this.messageElement.textContent = '';
-    this._scheduleNextTick();
+    this._startLoop(performance.now());
     this._resumeCommonTimers();
   }
 
