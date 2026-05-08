@@ -91,15 +91,17 @@ const STATE = Object.freeze({
   PLAYING: 'playing',
   WARNING: 'warning',
   IGNORED: 'ignored',
+  PAUSED: 'paused',
   OVER: 'over',
 });
 
 /** @type {Object<string, string[]>} Valid transitions for each state. */
 const STATE_TRANSITIONS = Object.freeze({
   [STATE.WAITING]: [STATE.PLAYING],
-  [STATE.PLAYING]: [STATE.WARNING, STATE.IGNORED, STATE.OVER],
-  [STATE.WARNING]: [STATE.PLAYING, STATE.OVER],
-  [STATE.IGNORED]: [STATE.PLAYING],
+  [STATE.PLAYING]: [STATE.WARNING, STATE.IGNORED, STATE.PAUSED, STATE.OVER],
+  [STATE.WARNING]: [STATE.PLAYING, STATE.PAUSED, STATE.OVER],
+  [STATE.IGNORED]: [STATE.PLAYING, STATE.PAUSED],
+  [STATE.PAUSED]: [STATE.PLAYING, STATE.WARNING, STATE.IGNORED],
   [STATE.OVER]: [STATE.WAITING],
 });
 
@@ -162,7 +164,7 @@ const MSG_CLICK_OR_TAP_TO_FOCUS = 'Click or tap to focus';
 /** @const {string} Initial instruction shown before the game starts. */
 const MSG_PRESS_ARROW_KEY_TO_START = 'Press any arrow key to start';
 /** @const {string} Prompt displayed after game reset. */
-const MSG_USE_ARROW_KEYS_TO_START = 'Use arrow keys or swipe to start';
+const MSG_USE_ARROW_KEYS_TO_START = 'Use arrow keys or tap to start';
 /** @const {string} Game-over overlay heading drawn on the canvas. */
 const MSG_GAME_OVER_OVERLAY = 'GAME OVER';
 /** @const {string} Game-over instruction below the canvas. */
@@ -1137,13 +1139,11 @@ class InputManager {
 
     this._boundKeydown = this._onKeydown.bind(this);
     this._boundTouchStart = this._onTouchStart.bind(this);
-    this._boundTouchMove = this._onTouchMove.bind(this);
     this._boundTouchEnd = this._onTouchEnd.bind(this);
     this._boundCanvasClick = this._onCanvasClick.bind(this);
 
     this._canvas.addEventListener('keydown', this._boundKeydown);
     this._wrapper.addEventListener('touchstart', this._boundTouchStart, { passive: false });
-    this._wrapper.addEventListener('touchmove', this._boundTouchMove, { passive: false });
     this._wrapper.addEventListener('touchend', this._boundTouchEnd, { passive: false });
     this._canvas.addEventListener('click', this._boundCanvasClick);
   }
@@ -1158,7 +1158,6 @@ class InputManager {
     }
     if (this._wrapper) {
       this._wrapper.removeEventListener('touchstart', this._boundTouchStart);
-      this._wrapper.removeEventListener('touchmove', this._boundTouchMove);
       this._wrapper.removeEventListener('touchend', this._boundTouchEnd);
     }
   }
@@ -1206,55 +1205,36 @@ class InputManager {
   }
 
   /**
-   * Minimum pixel distance a touch must travel to register as a swipe.
-   * @private
-   * @returns {number}
-   */
-  static get TOUCH_SWIPE_THRESHOLD() {
-    return 30;
-  }
-
-  /**
-   * Records the starting position of a touch for swipe detection.
+   * Handles a touch event on the canvas, determines the tapped zone relative
+   * to the center, and routes the resulting direction to the game input pipeline.
    * @private
    * @param {TouchEvent} e
    */
   _onTouchStart(e) {
     if (this._getState() === STATE.OVER) return;
-    if (this._getState() !== STATE.WAITING) {
-      e.preventDefault();
-    }
-    this._touchSwipeStart = {
-      x: e.touches[0].clientX,
-      y: e.touches[0].clientY,
-    };
-  }
-
-  /**
-   * Prevents page scrolling during game play.
-   * @private
-   * @param {TouchEvent} e
-   */
-  _onTouchMove(e) {
-    if (this._getState() === STATE.OVER) return;
     e.preventDefault();
-  }
 
-  /**
-   * Detects a swipe direction and routes it to the game input pipeline.
-   * @private
-   * @param {TouchEvent} e
-   */
-  _onTouchEnd(e) {
-    if (!this._touchSwipeStart) return;
-    const t = e.changedTouches[0];
-    const dx = t.clientX - this._touchSwipeStart.x;
-    const dy = t.clientY - this._touchSwipeStart.y;
-    if (Math.abs(dx) < InputManager.TOUCH_SWIPE_THRESHOLD && Math.abs(dy) < InputManager.TOUCH_SWIPE_THRESHOLD) return;
+    const rect = this._canvas.getBoundingClientRect();
+    const tx = e.touches[0].clientX - rect.left;
+    const ty = e.touches[0].clientY - rect.top;
+    const nx = tx / rect.width - 0.5;
+    const ny = ty / rect.height - 0.5;
 
-    const dir = Math.abs(dx) > Math.abs(dy) ? { x: dx > 0 ? 1 : -1, y: 0 } : { x: 0, y: dy > 0 ? 1 : -1 };
+    const dir = Math.abs(nx) > Math.abs(ny) ? { x: nx > 0 ? 1 : -1, y: 0 } : { x: 0, y: ny > 0 ? 1 : -1 };
 
     this._onDirection(dir);
+  }
+
+  /**
+   * Handles touch end to restart the game when in the OVER state
+   * (touch devices don't reliably fire click after touch events).
+   * @private
+   * @param {TouchEvent} _e
+   */
+  _onTouchEnd(_e) {
+    if (this._getState() === STATE.OVER) {
+      this._onRestart();
+    }
   }
 
   /**
@@ -1710,20 +1690,39 @@ class SnakeGame {
   _bindEvents() {
     this._onFocus = () => {
       this.overlay.classList.add('snake-hidden');
-      this._resumeGame();
+      if (this.state === STATE.PAUSED) {
+        this._resumeGame();
+      }
     };
     this._onBlur = () => {
+      if (this._ignoringNextBlur) {
+        this._ignoringNextBlur = false;
+        return;
+      }
       this.overlay.classList.remove('snake-hidden');
       this._pauseGame();
     };
     this._onClick = () => {
-      this.canvas.focus();
-      if (this.state === STATE.OVER) this.init();
+      if (this.state === STATE.OVER) {
+        this.init();
+      } else if (this.state === STATE.PAUSED) {
+        this._resumeGame();
+      }
+    };
+    this._onDocumentTouchStart = (e) => {
+      if (this.state === STATE.PLAYING || this.state === STATE.WARNING || this.state === STATE.IGNORED) {
+        const wrapper = this.container.querySelector('.snake-game-wrapper');
+        if (wrapper && !wrapper.contains(e.target)) {
+          this.overlay.classList.remove('snake-hidden');
+          this._pauseGame();
+        }
+      }
     };
 
     this.canvas.addEventListener('focus', this._onFocus);
     this.canvas.addEventListener('blur', this._onBlur);
     this.overlay.addEventListener('click', this._onClick);
+    document.addEventListener('touchstart', this._onDocumentTouchStart, { passive: true });
     this._resizeObserver = new ResizeObserver(() => this._resizeCanvas());
     this._resizeObserver.observe(this.container);
     requestAnimationFrame(() => this._resizeCanvas());
@@ -1737,6 +1736,7 @@ class SnakeGame {
     this.canvas.removeEventListener('focus', this._onFocus);
     this.canvas.removeEventListener('blur', this._onBlur);
     this.overlay.removeEventListener('click', this._onClick);
+    document.removeEventListener('touchstart', this._onDocumentTouchStart);
     this._resizeObserver.disconnect();
     this.input.destroy();
     this._stopLoop();
@@ -1761,7 +1761,8 @@ class SnakeGame {
     this.speed.currentSpeed = this.BASE_SPEED;
     this.foodsEaten = 0;
     this.scoreBonus.value = 100;
-    this.wasPaused = false;
+    this._pausedFromState = null;
+    this._ignoringNextBlur = false;
     this.input.speedBoostActive = false;
     this.input.buffer = [];
     this.input.direction = { x: 0, y: 0 };
@@ -2358,6 +2359,8 @@ class SnakeGame {
    * @private
    */
   _startGame() {
+    this.overlay.classList.add('snake-hidden');
+    this._ignoringNextBlur = true;
     this.canvas.focus();
     this._transitionTo(STATE.PLAYING);
     this.startTime = Date.now() - this.elapsed;
@@ -2386,37 +2389,41 @@ class SnakeGame {
   }
 
   /**
-   * Pauses the game on canvas blur. Clears all timers and stores the
-   * remaining warning elapsed time if in the WARNING state.
+   * Pauses the game on canvas blur. Transitions to PAUSED state,
+   * stores the current state for later resumption, and clears all timers.
    * @private
    */
   _pauseGame() {
     if (this.state !== STATE.PLAYING && this.state !== STATE.WARNING && this.state !== STATE.IGNORED) return;
-    this.wasPaused = true;
-    this._stopLoop();
-    this._clearAllTimers();
+    this._pausedFromState = this.state;
     if (this.state === STATE.WARNING) {
       this.warningElapsed = Date.now() - this.warningStart;
     }
+    this._transitionTo(STATE.PAUSED);
+    this._stopLoop();
+    this._clearAllTimers();
     this.overlay.textContent = MSG_PAUSED_RESUME;
   }
 
   /**
-   * Resumes the game after pause (canvas focus). Restores timers for the
-   * current state (PLAYING, WARNING, or IGNORED).
+   * Resumes the game after pause. Restores the previous state and
+   * all associated timers.
    * @private
    */
   _resumeGame() {
-    if (!this.wasPaused) return;
-    this.wasPaused = false;
-    if (this.state === STATE.PLAYING) {
+    if (!this._pausedFromState) return;
+    const from = this._pausedFromState;
+    this._pausedFromState = null;
+    this.overlay.classList.add('snake-hidden');
+    this._transitionTo(from);
+    if (from === STATE.PLAYING) {
       this.startTime = Date.now() - this.elapsed;
       this._startLoop(performance.now());
       this.timers.setInterval('timerInterval', () => this._updateTimerDisplay(), 1000);
       this._resumeCommonTimers();
       this.bonusFood.startTimers();
       this.wormholes.startTimers();
-    } else if (this.state === STATE.WARNING) {
+    } else if (from === STATE.WARNING) {
       const warningDuration = this.input.speedBoostActive
         ? WARNING_TIMEOUT_MS / SPEED_BOOST_FACTOR
         : WARNING_TIMEOUT_MS;
@@ -2427,7 +2434,7 @@ class SnakeGame {
       );
       this.timers.setInterval('timerInterval', () => this._updateTimerDisplay(), 1000);
       this._resumeCommonTimers();
-    } else if (this.state === STATE.IGNORED) {
+    } else if (from === STATE.IGNORED) {
       this.timers.setInterval('timerInterval', () => this._updateTimerDisplay(), 1000);
       this._resumeCommonTimers();
       this.bonusFood.startTimers();
@@ -2447,7 +2454,7 @@ class SnakeGame {
   }
 
   /**
-   * Routes a cardinal direction input (from keyboard or swipe) to the
+   * Routes a cardinal direction input (from keyboard or tap) to the
    * appropriate state-specific handler.
    * @private
    * @param {Point} dir
@@ -2465,6 +2472,10 @@ class SnakeGame {
         break;
       case STATE.PLAYING:
         this._handleInputPlaying(dir);
+        break;
+      case STATE.PAUSED:
+        this._resumeGame();
+        this._handleDirectionInput(dir);
         break;
     }
   }
