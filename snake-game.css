@@ -47,9 +47,6 @@ You should have received a copy of the CC0 Public Domain Dedication along with t
     display: none;
   }
 }
-.snake-hud .snake-bonus {
-  color: #ffd700;
-}
 .snake-canvas {
   display: block;
   background: #0d1a0d;
@@ -86,9 +83,6 @@ You should have received a copy of the CC0 Public Domain Dedication along with t
 }
 .snake-colorblind .snake-game-wrapper {
   border-color: #009e73;
-}
-.snake-colorblind .snake-hud .snake-bonus {
-  color: #f0e442;
 }
 .snake-colorblind .snake-focus-overlay {
   color: #009e73;

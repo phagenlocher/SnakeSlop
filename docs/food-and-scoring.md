@@ -39,21 +39,21 @@ When shrink is enabled, `SnakeBody.splice()` removes the tail half of segments. 
 
 ## Score Bonus (`ScoreBonusManager`)
 
-A decaying multiplier displayed as "Bonus: N" in the HUD:
+A decaying value appended to the score display (e.g. `Score: 123+99`):
 
 - Starts at 100
 - Decays by 1 every 200ms (5 points/second) to a floor of 0
 - When regular food is eaten, the current bonus is added to the score, then resets to 100
 - Decay timer pauses/resumes with the game
+- When the bonus reaches 0, the `+N` suffix is hidden (score shows as plain `Score: 123`)
 
-When `enableScoreBonus` is disabled, no bonus is added and the HUD element is not rendered.
+When `enableScoreBonus` is disabled, no bonus is added and no suffix is rendered.
 
 ## HUD
 
 The HUD bar displays:
 
-- **Score**: Running total, updated on each food eaten
-- **Bonus** (optional): Current decaying bonus value
+- **Score**: Running total with optional `+N` bonus suffix, updated on each food eaten
 - **Time**: `M:SS` format, counting up (classic/constrictor) or down (time trial)
 
 On small screens (< 510px), the HUD stacks vertically below the canvas.

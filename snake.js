@@ -977,29 +977,32 @@ class BonusFoodManager {
 }
 
 /**
- * Manages the decaying bonus score multiplier displayed as "Bonus: N" in the HUD.
+ * Manages the decaying bonus score displayed inline with the score (e.g. "Score: 123+99").
  * @classdesc Starts at 100, decays by 1 every 200ms to 0. Resets to 100
- * after each regular food is eaten. The current bonus value is added to the
- * score when food is eaten.
+ * after each regular food is eaten. The current bonus value is appended to the
+ * score display.
  */
 class ScoreBonusManager {
   /**
-   * @param {{ enabled: boolean, timers: TimerManager, getBonusElement: () => HTMLElement | null }} deps
+   * @param {{ enabled: boolean, timers: TimerManager, getScoreElement: () => HTMLElement | null, getScore: () => number, onScoreUpdate: () => void }} deps
    */
-  constructor({ enabled, timers, getBonusElement }) {
+  constructor({ enabled, timers, getScoreElement, getScore, onScoreUpdate }) {
     this._enabled = enabled;
     this._timers = timers;
-    this._getBonusElement = getBonusElement;
+    this._getScoreElement = getScoreElement;
+    this._getScore = getScore;
+    this._onScoreUpdate = onScoreUpdate;
     /** @type {number} Current bonus value (0-100). */
     this.value = 100;
   }
 
   /**
-   * Generates the HUD HTML fragment for the bonus display.
-   * @returns {string} HTML string, empty if disabled.
+   * Returns the suffix to append to the score display.
+   * @returns {string} e.g. "+99" or empty string.
    */
-  getHUDHtml() {
-    return this._enabled ? '<span class="snake-bonus">Bonus: 0</span>' : '';
+  getScoreSuffix() {
+    if (!this._enabled || this.value <= 0) return '';
+    return `+${this.value}`;
   }
 
   /**
@@ -1011,8 +1014,7 @@ class ScoreBonusManager {
     if (!this._enabled) return 0;
     const bonus = this.value > 0 ? this.value : 0;
     this.value = 100;
-    const el = this._getBonusElement();
-    if (el) el.textContent = `Bonus: ${this.value}`;
+    this._onScoreUpdate();
     this.startDecay();
     return bonus;
   }
@@ -1024,8 +1026,7 @@ class ScoreBonusManager {
       'scoreBonusInterval',
       () => {
         this.value = Math.max(0, this.value - 1);
-        const el = this._getBonusElement();
-        if (el) el.textContent = `Bonus: ${this.value}`;
+        this._onScoreUpdate();
         if (this.value === 0) this._timers.clear('scoreBonusInterval');
       },
       SCORE_BONUS_DECAY_INTERVAL_MS
@@ -1590,7 +1591,9 @@ class SnakeGame {
     this.scoreBonus = new ScoreBonusManager({
       enabled: this.options.enableScoreBonus,
       timers: this.timers,
-      getBonusElement: () => this.bonusElement,
+      getScoreElement: () => this.scoreElement,
+      getScore: () => this.score,
+      onScoreUpdate: () => this._updateScoreDisplay(),
     });
     /** @type {InputManager} */
     this.input = new InputManager({
@@ -1644,7 +1647,6 @@ class SnakeGame {
       <div class="snake-container">
         <div class="snake-hud">
           <span class="snake-score">Score: 0</span>
-          ${this.scoreBonus.getHUDHtml()}
           <span class="snake-timer">Time: 0:00</span>
         </div>
         <div class="snake-game-wrapper"><canvas class="snake-canvas" tabindex="0"></canvas><div class="snake-focus-overlay">${MSG_CLICK_OR_TAP_TO_FOCUS}</div></div>
@@ -1656,7 +1658,6 @@ class SnakeGame {
     this.ctx = this.canvas.getContext('2d');
     this.scoreElement = this.container.querySelector('.snake-score');
     this.timerElement = this.container.querySelector('.snake-timer');
-    this.bonusElement = this.container.querySelector('.snake-bonus');
     this.messageElement = this.container.querySelector('.snake-message');
     this.overlay = this.container.querySelector('.snake-focus-overlay');
     this.wrapper = this.container.querySelector('.snake-game-wrapper');
@@ -1789,9 +1790,6 @@ class SnakeGame {
     }
     this.scoreElement.textContent = 'Score: 0';
     this.timerElement.textContent = this.options.mode === MODE_TIME_TRIAL ? 'Time: 2:00' : 'Time: 0:00';
-    if (this.bonusElement) {
-      this.bonusElement.textContent = 'Bonus: 100';
-    }
     this.messageElement.textContent = MSG_USE_ARROW_KEYS_TO_START;
     this.overlay.textContent = MSG_CLICK_OR_TAP_TO_FOCUS;
     this._placeFood();
@@ -1927,7 +1925,7 @@ class SnakeGame {
   _eatRegularFood() {
     const points = 10 + this.scoreBonus.onFoodEaten();
     this.score += points;
-    this.scoreElement.textContent = `Score: ${this.score}`;
+    this._updateScoreDisplay();
     this.foodsEaten++;
     this.growth = 1;
     if (this.snake.length >= this.freeTiles) {
@@ -1947,10 +1945,18 @@ class SnakeGame {
   _eatBonusFood() {
     const result = this.bonusFood.onEat();
     this.score += result.points;
-    this.scoreElement.textContent = `Score: ${this.score}`;
+    this._updateScoreDisplay();
     if (result.shrinkBy > 0) {
       this.snake.splice(result.shrinkBy);
     }
+  }
+
+  /**
+   * Updates the HUD score display, appending the bonus suffix if active.
+   * @private
+   */
+  _updateScoreDisplay() {
+    this.scoreElement.textContent = `Score: ${this.score}${this.scoreBonus.getScoreSuffix()}`;
   }
 
   /**
