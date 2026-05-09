@@ -18,9 +18,12 @@ body {
   justify-content: center;
   align-items: center;
   height: 100vh;
-  font-family: 'Courier New', monospace;
+  font-family: monospace;
   color: #4a7a4a;
   overflow-x: hidden;
+}
+.snake-canvas {
+  font-family: monospace;
 }
 .snake-toggles {
   margin-bottom: 12px;
@@ -87,7 +90,7 @@ hr + .snake-features-details {
   color: #4a7a4a;
   border: 1px solid #4a7a4a;
   padding: 6px 10px;
-  font-family: 'Courier New', monospace;
+  font-family: monospace;
   font-size: 17px;
   letter-spacing: 1px;
   cursor: pointer;

@@ -2044,11 +2044,11 @@ class SnakeGame {
       this.ctx.fillStyle = this.colors.overlay;
       this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
       this.ctx.fillStyle = this.colors.overlayText;
-      this.ctx.font = `bold ${Math.max(16, Math.round(this.CELL_SIZE * 1.28))}px Courier New`;
+      this.ctx.font = `bold ${Math.max(16, Math.round(this.CELL_SIZE * 1.28))}px ${getComputedStyle(this.canvas).fontFamily}`;
       this.ctx.textAlign = 'center';
       this.ctx.textBaseline = 'middle';
       this.ctx.fillText(MSG_GAME_OVER_OVERLAY, this.canvas.width / 2, this.canvas.height / 2 - 20);
-      this.ctx.font = `${Math.max(12, Math.round(this.CELL_SIZE * 0.96))}px Courier New`;
+      this.ctx.font = `${Math.max(12, Math.round(this.CELL_SIZE * 0.96))}px ${getComputedStyle(this.canvas).fontFamily}`;
       this.ctx.fillText(`Score: ${this.score}`, this.canvas.width / 2, this.canvas.height / 2 + 20);
     }
   }
