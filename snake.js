@@ -871,7 +871,8 @@ class BonusFoodManager {
     ];
     const dir = dirs[Math.floor(Math.random() * dirs.length)];
     const next = { x: this.pos.x + dir.x, y: this.pos.y + dir.y };
-    const obstacleFree = () => !this._snakeHas(next.x, next.y) && !this._isWallAt(next.x, next.y) && !this._isWormholeEntryAt(next.x, next.y);
+    const obstacleFree = () =>
+      !this._snakeHas(next.x, next.y) && !this._isWallAt(next.x, next.y) && !this._isWormholeEntryAt(next.x, next.y);
     if (this._wrapEnabled) {
       this._wrap(next);
       if (obstacleFree()) {
