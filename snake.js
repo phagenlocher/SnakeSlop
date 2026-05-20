@@ -1615,7 +1615,7 @@ class SnakeGame {
     /** @type {number} Minimum game loop interval in ms (fastest speed). */
     this.MIN_SPEED = 50;
     /** @type {number} Rate step used for speed-up calculation. */
-    this.RATE_STEP = 0.2;
+    this.RATE_STEP = 0.1;
     /** @type {number} Time-trial countdown duration in ms (2 minutes). */
     this.TIME_LIMIT = 120_000;
     /** @type {object} Active color theme (THEME_DEFAULT or THEME_COLORBLIND). */
