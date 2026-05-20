@@ -1,5 +1,5 @@
 /*
-Snake Demo - A Snake game with togglable features to demonstrate game design. Renders on an HTML5 Canvas. Supports classic, time-trial, and constrictor modes with 12 togglable feature flags.
+SnakeSlop - A Snake game with togglable features to demonstrate game design. Renders on an HTML5 Canvas. Supports classic, time-trial, and constrictor modes with 12 togglable feature flags.
 Written in 2026 by Philipp Hagenlocher <me@philipphagenlocher.de>
 This software was written with the assistance of AI.
 
