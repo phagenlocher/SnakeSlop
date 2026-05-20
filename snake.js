@@ -991,7 +991,7 @@ class BonusFoodManager {
    */
   trySpawnOnCount(foodsEaten) {
     if (!this._enabled || this._timed) return;
-    if (foodsEaten % 5 === 0 && !this.active) {
+    if (foodsEaten > 0 && foodsEaten % 5 === 0 && !this.active) {
       this.place();
     }
   }
@@ -1867,6 +1867,7 @@ class SnakeGame {
     this.warningElapsed = 0;
     this.wormholes.entry = null;
     this.wormholes.exit = null;
+    this.bonusFood.pos = null;
     this._stopLoop();
     this.timers.clearAll();
     this.freeTiles = this.COLS * this.ROWS;
