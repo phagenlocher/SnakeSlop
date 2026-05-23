@@ -158,3 +158,21 @@ body.snake-colorblind {
     margin: 8px 0;
   }
 }
+.snake-repo-link {
+  margin-top: 16px;
+  text-align: center;
+}
+.snake-repo-link a {
+  color: #4a7a4a;
+  font-size: 14px;
+  letter-spacing: 1px;
+  text-decoration: none;
+  opacity: 0.6;
+}
+.snake-repo-link a:hover {
+  opacity: 1;
+  text-decoration: underline;
+}
+body.snake-colorblind .snake-repo-link a {
+  color: #009e73;
+}
