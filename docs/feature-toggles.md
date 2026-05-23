@@ -1,6 +1,6 @@
 # Feature Toggles
 
-All 12 toggles are controlled via checkboxes, persisted to `localStorage` under key `snake-game-settings`. The game is destroyed and remounted whenever a toggle changes. All default to `true` except `enableColorblindMode`.
+All 13 toggles are controlled via checkboxes, persisted to `localStorage` under key `snake-game-settings`. The game is destroyed and remounted whenever a toggle changes. All default to `true` except `enableColorblindMode` and `enableFaultFilter`.
 
 | Toggle                    | Default | Effect                                                                                        |
 | ------------------------- | ------- | --------------------------------------------------------------------------------------------- |
@@ -13,6 +13,7 @@ All 12 toggles are controlled via checkboxes, persisted to `localStorage` under 
 | `enableSpeedUp`           | `true`  | Tick rate accelerates with each food eaten (135ms → 50ms floor)                               |
 | `enableSpeedBoost`        | `true`  | Same-direction keypress multiplies speed by 1.35                                              |
 | `enableInputBuffer`       | `true`  | Queues up to 2 rapid direction inputs so none are lost between ticks                          |
+| `enableFaultFilter`       | `false` | Filters out direction inputs that would immediately cause wall, boundary, or self collision   |
 | `enableInstantMovement`   | `true`  | Snake moves immediately on valid keypress instead of waiting for next tick                    |
 | `enableWalls`             | `true`  | Renders 44 wall cells as a hollow square ring with collision                                  |
 | `enableWormholes`         | `true`  | Spawns teleport entry/exit pairs every 30 seconds                                             |
@@ -24,3 +25,4 @@ All 12 toggles are controlled via checkboxes, persisted to `localStorage` under 
 - `enableWrap` overrides boundary collision (walls remain solid)
 - `enableGracePeriod` has no effect on constrictor self-collision (which always enters `ignored`)
 - `enableInputBuffer` and `enableInstantMovement` compose naturally — buffer provides validation, instant moves consume buffer entries
+- `enableFaultFilter` composes with `enableInputBuffer` (filters buffered directions at commit time) and with `enableInstantMovement` (prevents instant tick from committing an unsafe direction)

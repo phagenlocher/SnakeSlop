@@ -25,4 +25,4 @@ Detailed documentation for each aspect of the codebase lives in `docs/`:
 | [game-loop](docs/game-loop.md)               | Tick pipeline, recursive timeout scheduling, speed management, pause/resume |
 | [food-and-scoring](docs/food-and-scoring.md) | Regular food, bonus food, enclosure eating, score bonus decay, HUD          |
 | [level-features](docs/level-features.md)     | Walls, wormholes, wrap boundaries                                           |
-| [feature-toggles](docs/feature-toggles.md)   | All 12 boolean flags, their effects, defaults, and dependencies             |
+| [feature-toggles](docs/feature-toggles.md)   | All 13 boolean flags, their effects, defaults, and dependencies             |

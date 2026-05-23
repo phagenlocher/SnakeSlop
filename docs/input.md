@@ -31,6 +31,10 @@ When disabled, direction is set directly on each keypress with no queuing.
 
 Pressing the same arrow key as the current direction activates a 1.35× speed multiplier. The snake head renders with a goldenrod palette. Changing direction deactivates the boost. Boost also shortens the warning grace period timeout by the same factor.
 
+## Fault Filter (`enableFaultFilter`)
+
+When enabled, direction inputs that would cause an immediate wall, boundary, or self collision are silently ignored. Works in both buffered and unbuffered modes. In buffered mode, unsafe buffered directions are skipped during `commitDirection()`. In unbuffered mode, the rejected direction is discarded immediately so it won't be applied on a later tick. Default is `false`.
+
 ## Instant Movement (`enableInstantMovement`)
 
 When enabled, a valid direction keypress triggers an immediate `_update()` call, and the rAF loop's accumulator is reset. This makes the snake move instantly rather than waiting for the next tick. Opposite-direction presses are ignored entirely.

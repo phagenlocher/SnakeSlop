@@ -40,9 +40,10 @@ Checkboxes in the UI control which mechanics are active. The game is destroyed a
 
 ### Input Handling
 
-| Feature          | What it does                                                                                                                        |
-| ---------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
-| Input Buffer     | Queues up to 2 rapid directional inputs so they aren't lost between ticks.                                                          |
+| Feature      | What it does                                                                                                                        |
+| ------------ | ----------------------------------------------------------------------------------------------------------------------------------- |
+| Input Buffer | Queues up to 2 rapid directional inputs so they aren't lost between ticks.                                                          |
+| Fault Filter | Blocks direction inputs that would immediately crash into a wall, boundary, or the snake's own body.                                |
 | Instant Movement | Each arrow key press moves the snake immediately instead of waiting for the next game tick. Opposite-direction presses are ignored. |
 
 ### Level Design
@@ -88,13 +89,14 @@ Pass any of these as the second argument to `new SnakeGame(container, options)`:
 | `enableWrap`               | `boolean` | `true`  | Wrap-around boundaries                                         |
 | `enableSpeedBoost`         | `boolean` | `true`  | Same-direction keypress boosts speed                           |
 | `enableInputBuffer`        | `boolean` | `true`  | Buffer up to 2 rapid inputs                                    |
+| `enableFaultFilter`        | `boolean` | `false` | Block unsafe direction inputs (wall/boundary/self)            |
 | `enableInstantMovement`    | `boolean` | `true`  | Move immediately on keypress                                   |
 | `enableTimedBonusFood`     | `boolean` | `true`  | Spawn bonus food every 15s                                     |
 | `enableWalls`              | `boolean` | `true`  | Wall ring inside arena                                         |
 | `enableWormholes`          | `boolean` | `true`  | Wormhole teleport pairs                                        |
 | `enableColorblindMode`     | `boolean` | `false` | Bang Wong colorblind-friendly palette                          |
 
-All options default to `true` except `mode` (`"classic"`) and `enableColorblindMode` (`false`). Omitted options fall back to these defaults.
+All options default to `true` except `mode` (`"classic"`), `enableColorblindMode` (`false`), and `enableFaultFilter` (`false`). Omitted options fall back to these defaults.
 
 ## License
 

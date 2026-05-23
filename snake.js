@@ -1171,6 +1171,7 @@ class InputManager {
     enableBuffer,
     enableBoost,
     enableInstant,
+    enableFaultFilter,
     isDirSafe,
     getState,
     onUpdate,
@@ -1181,6 +1182,7 @@ class InputManager {
     this._enableBuffer = enableBuffer;
     this._enableBoost = enableBoost;
     this._enableInstant = enableInstant;
+    this._enableFaultFilter = enableFaultFilter;
     this._isDirSafe = isDirSafe;
     this._getState = getState;
     this._onUpdate = onUpdate;
@@ -1333,11 +1335,11 @@ class InputManager {
           this.buffer.shift();
           continue;
         }
-        if (this._isDirSafe(next)) {
-          this.buffer.shift();
-          effectiveDir = next;
+        if (this._enableFaultFilter && !this._isDirSafe(next)) {
           break;
         }
+        this.buffer.shift();
+        effectiveDir = next;
         break;
       }
 
@@ -1349,7 +1351,11 @@ class InputManager {
         this.graceDirection = { x: 0, y: 0 };
       }
     } else {
-      this.direction = this.nextDirection;
+      if (!this._enableFaultFilter || this._isDirSafe(this.nextDirection)) {
+        this.direction = this.nextDirection;
+      } else {
+        this.nextDirection = { x: this.direction.x, y: this.direction.y };
+      }
     }
   }
 
@@ -1599,6 +1605,7 @@ class SnakeGame {
       enableWrap: options.enableWrap === undefined ? true : options.enableWrap,
       enableSpeedBoost: options.enableSpeedBoost === undefined ? true : options.enableSpeedBoost,
       enableInputBuffer: options.enableInputBuffer === undefined ? true : options.enableInputBuffer,
+      enableFaultFilter: options.enableFaultFilter === undefined ? false : options.enableFaultFilter,
       enableInstantMovement: options.enableInstantMovement === undefined ? true : options.enableInstantMovement,
       enableTimedBonusFood: options.enableTimedBonusFood === undefined ? true : options.enableTimedBonusFood,
       enableWalls: options.enableWalls === undefined ? true : options.enableWalls,
@@ -1682,6 +1689,7 @@ class SnakeGame {
       enableBuffer: this.options.enableInputBuffer,
       enableBoost: this.options.enableSpeedBoost,
       enableInstant: this.options.enableInstantMovement,
+      enableFaultFilter: this.options.enableFaultFilter,
       isDirSafe: (dir) => this.collision.isDirSafe(dir),
       getState: () => this.state,
       onUpdate: () => this._update(),
