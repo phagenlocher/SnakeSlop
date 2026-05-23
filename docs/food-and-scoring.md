@@ -45,9 +45,9 @@ When shrink is enabled, `SnakeBody.splice()` removes the tail half of segments. 
 
 A decaying value appended to the score display (e.g. `Score: 123+99`):
 
-- Starts at 100
+- Starts at 99
 - Decays by 1 every 200ms (5 points/second) to a floor of 0
-- When regular food is eaten, the current bonus is added to the score, then resets to 100
+- When regular food is eaten, the current bonus is added to the score, then resets to 99
 - Decay timer pauses/resumes with the game
 - When the bonus reaches 0, the `+N` suffix is hidden (score shows as plain `Score: 123`)
 

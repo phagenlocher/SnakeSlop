@@ -7,7 +7,7 @@ All 13 toggles are controlled via checkboxes, persisted to `localStorage` under 
 | `enableBonusFood`         | `true`  | Enables golden diamond bonus food (spawning, movement, rendering, eating)                     |
 | `enableTimedBonusFood`    | `true`  | Spawns bonus food every 15 seconds instead of every 5 foods eaten. Requires `enableBonusFood` |
 | `enableShrinkOnBonusFood` | `true`  | Halves snake length when bonus food is eaten. Requires `enableBonusFood`                      |
-| `enableScoreBonus`        | `true`  | Enables decaying bonus multiplier (100→0) in HUD and score calculation                        |
+| `enableScoreBonus`        | `true`  | Enables decaying bonus multiplier (99→0) in HUD and score calculation                        |
 | `enableGracePeriod`       | `true`  | 700ms warning window before game over on collision, with safe-direction escape                |
 | `enableWrap`              | `true`  | Snake wraps around grid edges instead of dying at boundaries                                  |
 | `enableSpeedUp`           | `true`  | Tick rate accelerates with each food eaten (135ms → 50ms floor)                               |

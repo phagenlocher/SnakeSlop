@@ -1043,7 +1043,7 @@ class BonusFoodManager {
 /**
  * Manages the decaying bonus score displayed inline with the score (e.g. "Score: 123+99").
  *
- * @classdesc Starts at 100, decays by 1 every 200ms to 0. Resets to 100
+ * @classdesc Starts at 99, decays by 1 every 200ms to 0. Resets to 99
  * after each regular food is eaten. The current bonus value is appended to the
  * score display.
  */
@@ -1057,8 +1057,8 @@ class ScoreBonusManager {
     this._getScoreElement = getScoreElement;
     this._getScore = getScore;
     this._onScoreUpdate = onScoreUpdate;
-    /** @type {number} Current bonus value (0-100). */
-    this.value = 100;
+    /** @type {number} Current bonus value (0-99). */
+    this.value = 99;
   }
 
   /**
@@ -1080,7 +1080,7 @@ class ScoreBonusManager {
   onFoodEaten() {
     if (!this._enabled) return 0;
     const bonus = Math.max(this.value, 0);
-    this.value = 100;
+    this.value = 99;
     this._onScoreUpdate();
     this.startDecay();
     return bonus;
@@ -1862,7 +1862,7 @@ class SnakeGame {
     this._transitionTo(STATE.WAITING);
     this.speed.currentSpeed = this.BASE_SPEED;
     this.foodsEaten = 0;
-    this.scoreBonus.value = 100;
+    this.scoreBonus.value = 99;
     this.wasPaused = false;
     this._previousState = null;
     this.input.speedBoostActive = false;

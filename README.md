@@ -27,7 +27,7 @@ Checkboxes in the UI control which mechanics are active. The game is destroyed a
 | Bonus Food           | A golden diamond appears every 15 seconds. Worth 100 points, moves around, expires after 5 seconds.                         |
 | Timed Bonus Food     | Bonus food spawns every 15 seconds instead of every 5 foods eaten.                                                          |
 | Shrink on Bonus Food | Eating bonus food cuts the snake's length in half. In Constrictor mode, the snake shrinks down to a minimum of 15 segments. |
-| Score Bonus          | A decaying bonus score (starts at 100, drops by 5/s) that adds extra points when you eat regular food.                      |
+| Score Bonus          | A decaying bonus score (starts at 99, drops by 5/s) that adds extra points when you eat regular food.                      |
 
 ### Movement and Speed
 
