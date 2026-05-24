@@ -14,7 +14,7 @@ Open `index.html` in any browser to play.
 | ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | Classic     | Standard Snake. Timer counts up, no time limit. Game over on collision or when the board is completely filled.                                                                                                                                                                                                                                                                                                                             |
 | Time Trial  | Race against the clock. Timer counts down from 2:00. Game over when time runs out, on collision, or when the board is completely filled. All Classic rules apply.                                                                                                                                                                                                                                                                          |
-| Time Seeker | Like Time Trial, but bonus food adds up to +10 seconds to the countdown (capped at 2:00). Bonus food is always enabled. |
+| Time Seeker | Like Time Trial, but bonus food adds up to +8 seconds to the countdown (capped at 2:00). Bonus food is always enabled. |
 
 ## Togglable Features
 

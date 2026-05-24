@@ -159,7 +159,7 @@ const BONUS_FOOD_LIFETIME_MS = 5000;
 /** @constant {number} Bonus food spawn interval in ms (timed mode). */
 const BONUS_FOOD_SPAWN_INTERVAL_MS = 15_000;
 /** @constant {number} Time added by bonus food in Time Seeker mode in ms. */
-const BONUS_TIME_MS = 10_000;
+const BONUS_TIME_MS = 8000;
 /** @constant {number} Score bonus decay interval in ms. */
 const SCORE_BONUS_DECAY_INTERVAL_MS = 200;
 

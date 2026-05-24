@@ -69,4 +69,4 @@ A 1-second interval updates the HUD timer display:
 
 - **Classic**: Counts up from `0:00` as `M:SS`
 - **Time Trial**: Counts down from `2:00` as `M:SS`; triggers game over at `0:00`
-- **Time Seeker**: Counts down from `2:00` as `M:SS`; eating bonus food adds up to +10 seconds (capped at 2:00)
+- **Time Seeker**: Counts down from `2:00` as `M:SS`; eating bonus food adds up to +8 seconds (capped at 2:00)
