@@ -1225,16 +1225,12 @@ class InputManager {
   }
 
   /**
-   * Handles canvas click/tap events. Restarts the game when in the OVER state,
-   * providing a mobile-friendly alternative to the spacebar.
+   * Minimum pixel distance from canvas center a tap must be to register
+   * as a direction input.
    *
-   * @private
-   */
-  /**
-   * Minimum pixel distance from canvas center a tap must be to register as a direction input.
-   *
-   * @private
    * @returns {number} The minimum tap distance from center.
+   */
+  static get TOUCH_TAP_THRESHOLD() {
     return 20;
   }
 
@@ -1413,17 +1409,7 @@ class CollisionResolver {
    *   onGameOver: () => void,
    * }} opts Feature flags, spatial queries, wrapping, grid dimensions, and collision callbacks.
    */
-  constructor({
-    graceEnabled,
-    isWallAt,
-    snakeHas,
-    snakeHead,
-    wrap,
-    cols,
-    rows,
-    onEnterWarning,
-    onGameOver,
-  }) {
+  constructor({ graceEnabled, isWallAt, snakeHas, snakeHead, wrap, cols, rows, onEnterWarning, onGameOver }) {
     this._graceEnabled = graceEnabled;
     this._isWallAt = isWallAt;
     this._snakeHas = snakeHas;
@@ -1838,21 +1824,6 @@ class SnakeGame {
    * @private
    * @returns {Point|null} A free cell, or null if the board is full.
    */
-  _findAnyFreeTile() {
-    for (let y = 0; y < this.ROWS; y++) {
-      for (let x = 0; x < this.COLS; x++) {
-        if (
-          !this.snake.has(x, y) &&
-          !this.walls.isWallAt(x, y) &&
-          !(this.wormholes.entry && x === this.wormholes.entry.x && y === this.wormholes.entry.y)
-        ) {
-          return { x, y };
-        }
-      }
-    }
-    return null;
-  }
-
   /**
    * Consumes the regular food: awards 10 pts + score bonus, increments
    * foodsEaten, sets growth, triggers board-full check, and places new food.

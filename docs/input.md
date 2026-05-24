@@ -32,7 +32,7 @@ Pressing the same arrow key as the current direction activates a 1.35× speed mu
 
 ## Fault Filter (`enableFaultFilter`)
 
-When enabled, direction inputs that would cause an immediate wall, boundary, or self collision are silently ignored. Works in both buffered and unbuffered modes. In buffered mode, unsafe buffered directions are skipped during `commitDirection()`. In unbuffered mode, the rejected direction is discarded immediately so it won't be applied on a later tick. Default is `false`.
+When enabled, direction inputs that would cause an immediate wall, boundary, or self collision are silently ignored. Works in both buffered and unbuffered modes. In buffered mode, unsafe buffered directions are skipped during `commitDirection()`. In unbuffered mode, the rejected direction is discarded immediately so it won't be applied on a later tick. Default is `true`.
 
 ## Instant Movement (`enableInstantMovement`)
 

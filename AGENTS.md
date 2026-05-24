@@ -10,6 +10,12 @@ Open `index.html` directly in a browser.
 
 `npm run lint` — runs ESLint against `snake.js`.
 
+## Format
+
+`npm run format` — formats `snake.js` with Prettier (single quotes, semicolons, 120 print width).
+
+`npm run format:check` — checks `snake.js` with Prettier without writing.
+
 ## Architecture Documentation
 
 Detailed documentation for each aspect of the codebase lives in `docs/`:
@@ -21,8 +27,8 @@ Detailed documentation for each aspect of the codebase lives in `docs/`:
 | [game-modes](docs/game-modes.md)             | Classic, Time Trial, and Time Seeker mode behavior differences              |
 | [rendering](docs/rendering.md)               | Pre-rendered tile system, color themes, responsive canvas sizing            |
 | [input](docs/input.md)                       | Keyboard, touch/swipe, input buffering, speed boost, instant movement       |
-| [collision](docs/collision.md)               | Wall/boundary/self collision, grace period       |
+| [collision](docs/collision.md)               | Wall/boundary/self collision, grace period                                  |
 | [game-loop](docs/game-loop.md)               | Tick pipeline, recursive timeout scheduling, speed management, pause/resume |
-| [food-and-scoring](docs/food-and-scoring.md) | Regular food, bonus food, enclosure eating, score bonus decay, HUD          |
+| [food-and-scoring](docs/food-and-scoring.md) | Regular food, bonus food, score bonus decay, HUD                            |
 | [level-features](docs/level-features.md)     | Walls, wormholes, wrap boundaries                                           |
 | [feature-toggles](docs/feature-toggles.md)   | All 13 boolean flags, their effects, defaults, and dependencies             |
