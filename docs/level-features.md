@@ -19,7 +19,6 @@ Teleport entry/exit pair that appears periodically.
 - **Lifetime**: Auto-despawns after 15 seconds, or immediately when the snake enters the entry cell.
 - **Teleport**: Snake head stepping onto the entry cell instantly appears at the exit, continuing in the same direction. Both wormholes are consumed.
 - **Collision**: If the exit cell is occupied by the snake's body, normal collision rules apply (grace period or game over).
-- **Constrictor**: Wormhole cells do not block flood-fill enclosure checks. Teleport fires before constrictor-specific head-food logic.
 - **Placement**: Entry and exit avoid snake body, food, bonus food, and wall cells. Regular and bonus food also avoid wormhole entry cells (but may spawn on exit cells).
 
 When disabled, no wormholes spawn; rendering, timers, and teleport checks are skipped.
@@ -31,6 +30,5 @@ When enabled, the snake teleports to the opposite edge instead of dying at bound
 - **Head movement**: Position wraps via modulo: `x = (x + COLS) % COLS`, `y = (y + ROWS) % ROWS`
 - **Bonus food movement**: Also wraps when moving randomly
 - **Drawing**: `_getSegmentTileKey()` uses wrap-aware direction computation for correct segment shapes across wraps
-- **Enclosure**: Flood-fill BFS wraps, comparing connected component sizes
 
 When disabled, hitting any grid edge triggers collision logic.

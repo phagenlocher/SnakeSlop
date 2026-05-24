@@ -1,5 +1,5 @@
 /*
-SnakeSlop - A Snake game with togglable features to demonstrate game design. Renders on an HTML5 Canvas. Supports classic, time-trial, and constrictor modes with 12 togglable feature flags.
+SnakeSlop - A Snake game with togglable features to demonstrate game design. Renders on an HTML5 Canvas. Supports classic, time-trial, and time-seeker modes with 12 togglable feature flags.
 Written in 2026 by Philipp Hagenlocher <me@philipphagenlocher.de>
 This software was written with the assistance of AI.
 
@@ -84,23 +84,10 @@ const WALLS = [
   { x: 16, y: 15 },
 ];
 
-/**
- * Creates a string key for a grid cell.
- *
- * @param {number} x Grid column.
- * @param {number} y Grid row.
- * @returns {string} The string key.
- */
-function key(x, y) {
-  return `${x},${y}`;
-}
-
 /** @type {string} Classic mode — no time limit, standard snake experience. */
 const MODE_CLASSIC = 'classic';
 /** @type {string} Time-trial mode — 2-minute countdown. */
 const MODE_TIME_TRIAL = 'timeTrial';
-/** @type {string} Constrictor mode — food eaten by enclosure. */
-const MODE_CONSTRICTOR = 'constrictor';
 /** @type {string} Time-seeker mode — like time trial but bonus food adds +10s. */
 const MODE_TIME_SEEKER = 'timeSeeker';
 
@@ -109,7 +96,6 @@ const STATE = Object.freeze({
   WAITING: 'waiting',
   PLAYING: 'playing',
   WARNING: 'warning',
-  IGNORED: 'ignored',
   UNFOCUSED: 'unfocused',
   OVER: 'over',
 });
@@ -117,10 +103,9 @@ const STATE = Object.freeze({
 /** @type {{[key: string]: string[]}} Valid transitions for each state. */
 const STATE_TRANSITIONS = Object.freeze({
   [STATE.WAITING]: [STATE.PLAYING],
-  [STATE.PLAYING]: [STATE.WARNING, STATE.IGNORED, STATE.OVER, STATE.UNFOCUSED],
+  [STATE.PLAYING]: [STATE.WARNING, STATE.OVER, STATE.UNFOCUSED],
   [STATE.WARNING]: [STATE.PLAYING, STATE.OVER, STATE.UNFOCUSED],
-  [STATE.IGNORED]: [STATE.PLAYING, STATE.UNFOCUSED],
-  [STATE.UNFOCUSED]: [STATE.PLAYING, STATE.WARNING, STATE.IGNORED],
+  [STATE.UNFOCUSED]: [STATE.PLAYING, STATE.WARNING],
   [STATE.OVER]: [STATE.WAITING],
 });
 
@@ -138,7 +123,6 @@ const THEME_DEFAULT = {
   overlayText: '#ffffff',
   paletteNormal: { body: '#4a7a4a', head: '#8ad88a', eye: '#0d1a0d' },
   paletteWarning: { body: '#ff6666', head: '#ffaaaa', eye: '#4a0000' },
-  paletteIgnored: { body: '#c084fc', head: '#e2ccff', eye: '#4a0060' },
   paletteBoost: { body: '#4a7a4a', head: '#f0e68c', eye: '#0d1a0d' },
 };
 
@@ -156,7 +140,6 @@ const THEME_COLORBLIND = {
   overlayText: '#ffffff',
   paletteNormal: { body: '#009e73', head: '#56b4e9', eye: '#000000' },
   paletteWarning: { body: '#d55e00', head: '#e69f00', eye: '#000000' },
-  paletteIgnored: { body: '#cc79a7', head: '#56b4e9', eye: '#000000' },
   paletteBoost: { body: '#009e73', head: '#f0e442', eye: '#000000' },
 };
 /** @constant {number} Wormhole spawn interval in ms. */
@@ -190,8 +173,6 @@ const MSG_USE_ARROW_KEYS_TO_START = 'Use arrow keys or tap to start';
 const MSG_GAME_OVER_OVERLAY = 'GAME OVER';
 /** Game over instruction below the canvas. @constant {string} */
 const MSG_GAME_OVER_RESTART = 'Game Over! Press Space or tap to restart';
-/** @constant {string} Constrictor ignored-state prompt. */
-const MSG_SNAKE_STUCK = 'Snake stuck \u2014 press a safe direction';
 /** @constant {string} Pause overlay text shown on blur. */
 const MSG_PAUSED_RESUME = 'Paused \u2014 Click or tap to resume';
 
@@ -808,12 +789,12 @@ class WormholesManager {
  *
  * @classdesc Handles the golden diamond bonus food that appears on a timer,
  * moves randomly, and can be eaten by the snake head (classic/time-trial) or
- * by enclosure (constrictor).
+ * by head collision.
  */
 class BonusFoodManager {
   /**
    * @param {{
-   *   enabled: boolean, timed: boolean, canShrink: boolean, isConstrictor: boolean,
+   *   enabled: boolean, timed: boolean, canShrink: boolean,
    *   cols: number, rows: number,
    *   snakeHas: (x: number, y: number) => boolean,
    *   snakeLength: () => number,
@@ -823,16 +804,13 @@ class BonusFoodManager {
    *   isInBounds: (x: number, y: number) => boolean,
    *   timers: TimerManager,
    *   getCurrentSpeed: () => number,
-   *   isFoodEnclosed: (p: Point) => boolean,
    *   isWormholeEntryAt: (x: number, y: number) => boolean,
-   *   onEatCallback: () => void,
-   * }} opts Feature flags, grid dimensions, spatial queries, wrapping, timer service, and eat callback.
+   * }} opts Feature flags, grid dimensions, spatial queries, wrapping, and timer service.
    */
   constructor({
     enabled,
     timed,
     canShrink,
-    isConstrictor,
     cols,
     rows,
     snakeHas,
@@ -844,14 +822,11 @@ class BonusFoodManager {
     isInBounds,
     timers,
     getCurrentSpeed,
-    isFoodEnclosed,
     isWormholeEntryAt,
-    onEatCallback,
   }) {
     this._enabled = enabled;
     this._timed = timed;
     this._canShrink = canShrink;
-    this._isConstrictor = isConstrictor;
     this._cols = cols;
     this._rows = rows;
     this._snakeHas = snakeHas;
@@ -863,9 +838,7 @@ class BonusFoodManager {
     this._isInBounds = isInBounds;
     this._timers = timers;
     this._getCurrentSpeed = getCurrentSpeed;
-    this._isFoodEnclosed = isFoodEnclosed;
     this._isWormholeEntryAt = isWormholeEntryAt;
-    this._onEatCallback = onEatCallback;
     /** @type {Point|null} Current bonus food position. */
     this.pos = null;
   }
@@ -916,7 +889,6 @@ class BonusFoodManager {
   /**
    * Moves bonus food one step in a random cardinal direction.
    * Respects wrap boundaries and wall obstacles.
-   * In constrictor mode, checks if the new position is enclosed and eats it.
    *
    * @private
    */
@@ -942,9 +914,6 @@ class BonusFoodManager {
         this.pos = next;
       }
     }
-    if (this._isConstrictor && this.pos && this._isFoodEnclosed(this.pos)) {
-      this._onEatCallback();
-    }
   }
 
   /**
@@ -958,15 +927,6 @@ class BonusFoodManager {
   }
 
   /**
-   * Checks whether the bonus food is enclosed by the snake.
-   *
-   * @returns {boolean} Whether the bonus food is enclosed.
-   */
-  isEnclosed() {
-    return this._enabled && this.active && this._isFoodEnclosed(this.pos);
-  }
-
-  /**
    * Handles bonus food consumption. Returns points awarded and optional shrink amount.
    * The caller (SnakeGame) applies the shrink to the snake.
    *
@@ -975,12 +935,10 @@ class BonusFoodManager {
   onEat() {
     if (this._canShrink) {
       const shrunkLen = Math.ceil(this._snakeLength() / 2);
-      if (!this._isConstrictor || shrunkLen >= 15) {
-        this._timers.clear('bonusFoodInterval');
-        this._timers.clear('bonusFoodTimeout');
-        this.pos = null;
-        return { points: 100, shrinkBy: shrunkLen };
-      }
+      this._timers.clear('bonusFoodInterval');
+      this._timers.clear('bonusFoodTimeout');
+      this.pos = null;
+      return { points: 100, shrinkBy: shrunkLen };
     }
     this._timers.clear('bonusFoodInterval');
     this._timers.clear('bonusFoodTimeout');
@@ -1439,13 +1397,12 @@ class InputManager {
  * Detects and resolves collisions.
  *
  * @classdesc Checks wall, boundary, and self-collisions and routes them
- * through the grace period, constrictor ignored state, or game over logic.
+ * through the grace period or game over logic.
  */
 class CollisionResolver {
   /**
    * @param {{
    *   graceEnabled: boolean,
-   *   isConstrictor: boolean,
    *   isWallAt: (x: number, y: number) => boolean,
    *   snakeHas: (x: number, y: number) => boolean,
    *   snakeHead: () => Point,
@@ -1453,13 +1410,11 @@ class CollisionResolver {
    *   cols: number,
    *   rows: number,
    *   onEnterWarning: () => void,
-   *   onEnterIgnored: () => void,
    *   onGameOver: () => void,
    * }} opts Feature flags, spatial queries, wrapping, grid dimensions, and collision callbacks.
    */
   constructor({
     graceEnabled,
-    isConstrictor,
     isWallAt,
     snakeHas,
     snakeHead,
@@ -1467,11 +1422,9 @@ class CollisionResolver {
     cols,
     rows,
     onEnterWarning,
-    onEnterIgnored,
     onGameOver,
   }) {
     this._graceEnabled = graceEnabled;
-    this._isConstrictor = isConstrictor;
     this._isWallAt = isWallAt;
     this._snakeHas = snakeHas;
     this._snakeHead = snakeHead;
@@ -1479,7 +1432,6 @@ class CollisionResolver {
     this._cols = cols;
     this._rows = rows;
     this._onEnterWarning = onEnterWarning;
-    this._onEnterIgnored = onEnterIgnored;
     this._onGameOver = onGameOver;
   }
 
@@ -1498,29 +1450,6 @@ class CollisionResolver {
   }
 
   /**
-   * Checks whether the snake has any safe move from its current head position.
-   *
-   * @returns {boolean} Whether any safe move exists.
-   */
-  hasAnySafeMove() {
-    const dirs = [
-      { x: 0, y: -1 },
-      { x: 0, y: 1 },
-      { x: -1, y: 0 },
-      { x: 1, y: 0 },
-    ];
-    const head = this._snakeHead();
-    for (const dir of dirs) {
-      const pos = this._wrap({ x: head.x + dir.x, y: head.y + dir.y });
-      const c = this.getCollision(pos);
-      if (!c.wall && !c.boundary && !c.self) {
-        return true;
-      }
-    }
-    return false;
-  }
-
-  /**
    * Checks whether moving in a given direction from the head is safe.
    *
    * @param {Point} dir Direction vector.
@@ -1535,7 +1464,7 @@ class CollisionResolver {
 
   /**
    * Resolves collision for the next head position. Routes to warning (grace
-   * period), ignored (constrictor self-collision), or immediate game over.
+   * period) or immediate game over.
    *
    * @param {Point} nextHead The next head position to check.
    * @returns {boolean} True if a collision was detected and handled.
@@ -1543,14 +1472,6 @@ class CollisionResolver {
   resolve(nextHead) {
     const { wall, boundary, self } = this.getCollision(nextHead);
     if (wall || boundary || self) {
-      if (this._isConstrictor && self) {
-        if (this.hasAnySafeMove()) {
-          this._onEnterIgnored();
-        } else {
-          this._onGameOver();
-        }
-        return true;
-      }
       if (this._graceEnabled) {
         this._onEnterWarning();
       } else {
@@ -1581,7 +1502,7 @@ class SnakeGame {
   /**
    * @param {HTMLElement} container The DOM element to mount the game into.
    * @param {object} [options={}] Feature toggles and mode selector.
-   * @param {string} [options.mode='classic'] Game mode: 'classic', 'timeTrial', 'constrictor', or 'timeSeeker'.
+   * @param {string} [options.mode='classic'] Game mode: 'classic', 'timeTrial', or 'timeSeeker'.
    * @param {boolean} [options.enableBonusFood=true] Enable golden diamond bonus food.
    * @param {boolean} [options.enableGracePeriod=true] Enable 1-second warning before collision.
    * @param {boolean} [options.enableShrinkOnBonusFood=true] Halve snake length on bonus food.
@@ -1666,7 +1587,6 @@ class SnakeGame {
       enabled: this.options.enableBonusFood,
       timed: this.options.enableTimedBonusFood,
       canShrink: this.options.enableShrinkOnBonusFood,
-      isConstrictor: this.options.mode === MODE_CONSTRICTOR,
       cols: this.COLS,
       rows: this.ROWS,
       snakeHas: (x, y) => this.snake.has(x, y),
@@ -1678,10 +1598,8 @@ class SnakeGame {
       isInBounds: (x, y) => this.boundary.isInBounds(x, y),
       timers: this.timers,
       getCurrentSpeed: () => this.speed.currentSpeed,
-      isFoodEnclosed: (p) => this._isFoodEnclosed(p),
       isWormholeEntryAt: (x, y) =>
         this.wormholes.entry !== null && this.wormholes.entry.x === x && this.wormholes.entry.y === y,
-      onEatCallback: () => this._eatBonusFood(),
     });
     /** @type {ScoreBonusManager} */
     this.scoreBonus = new ScoreBonusManager({
@@ -1716,7 +1634,6 @@ class SnakeGame {
     /** @type {CollisionResolver} */
     this.collision = new CollisionResolver({
       graceEnabled: this.options.enableGracePeriod,
-      isConstrictor: this.options.mode === MODE_CONSTRICTOR,
       isWallAt: (x, y) => this.walls.isWallAt(x, y),
       snakeHas: (x, y) => this.snake.has(x, y),
       snakeHead: () => this.snake.head(),
@@ -1724,7 +1641,6 @@ class SnakeGame {
       cols: this.COLS,
       rows: this.ROWS,
       onEnterWarning: () => this._enterWarning(),
-      onEnterIgnored: () => this._enterIgnored(),
       onGameOver: () => this._gameOver(),
     });
 
@@ -1878,7 +1794,6 @@ class SnakeGame {
     this.input.nextDirection = { x: 0, y: 0 };
     this.input.graceDirection = { x: 0, y: 0 };
     this.growth = 0;
-    this.startGrowth = 0;
     this.warningElapsed = 0;
     this.wormholes.entry = null;
     this.wormholes.exit = null;
@@ -1900,30 +1815,19 @@ class SnakeGame {
 
   /**
    * Places regular food at a random valid position (not on snake, wall, or
-   * enclosed region in constrictor mode).
+   * wormhole entry).
    *
    * @private
    */
   _placeFood() {
-    const isConstrictor = this.options.mode === MODE_CONSTRICTOR;
     let pos;
-    let tries = 0;
-    const maxTries = 200;
     do {
       pos = { x: Math.floor(Math.random() * this.COLS), y: Math.floor(Math.random() * this.ROWS) };
-      tries++;
     } while (
       this.snake.has(pos.x, pos.y) ||
       this.walls.isWallAt(pos.x, pos.y) ||
-      (this.wormholes.entry && pos.x === this.wormholes.entry.x && pos.y === this.wormholes.entry.y) ||
-      (isConstrictor && tries < maxTries && this._isFoodEnclosed(pos))
+      (this.wormholes.entry && pos.x === this.wormholes.entry.x && pos.y === this.wormholes.entry.y)
     );
-    if (isConstrictor && this._isFoodEnclosed(pos)) {
-      const fallback = this._findAnyFreeTile();
-      if (fallback) {
-        pos = fallback;
-      }
-    }
     /** @type {Point} Regular food position. */
     this.food = pos;
   }
@@ -1947,83 +1851,6 @@ class SnakeGame {
       }
     }
     return null;
-  }
-
-  /**
-   * Determines whether a grid position is enclosed by the snake using BFS
-   * flood fill. In non-wrap mode, a region is enclosed if it cannot reach the
-   * grid boundary. In wrap mode, the food's connected component is compared
-   * against the largest other connected component.
-   *
-   * @private
-   * @param {Point} pos The position to check.
-   * @returns {boolean} True if the position is enclosed.
-   */
-  _isFoodEnclosed(pos) {
-    const wallSet = this.walls.getWallSet();
-    const isBlocked = (x, y) => this.snake.has(x, y) || wallSet.has(key(x, y));
-    const wrap = this.boundary.enabled;
-
-    const floodSize = (sx, sy, visited) => {
-      let size = 0;
-      const q = [{ x: sx, y: sy }];
-      let head = 0;
-      visited.add(key(sx, sy));
-      while (head < q.length) {
-        const { x, y } = q[head++];
-        size++;
-        for (const [dx, dy] of [
-          [0, 1],
-          [0, -1],
-          [1, 0],
-          [-1, 0],
-        ]) {
-          let nx = x + dx,
-            ny = y + dy;
-          if (wrap) {
-            nx = (nx + this.COLS) % this.COLS;
-            ny = (ny + this.ROWS) % this.ROWS;
-          } else if (nx < 0 || nx >= this.COLS || ny < 0 || ny >= this.ROWS) {
-            continue;
-          }
-          const k = key(nx, ny);
-          if (visited.has(k) || isBlocked(nx, ny)) {
-            continue;
-          }
-          visited.add(k);
-          q.push({ x: nx, y: ny });
-        }
-      }
-      return size;
-    };
-
-    const visited = new Set();
-    const foodSize = floodSize(pos.x, pos.y, visited);
-
-    if (!wrap) {
-      for (const k of visited) {
-        const [xs, ys] = k.split(',');
-        if (+xs === 0 || +xs === this.COLS - 1 || +ys === 0 || +ys === this.ROWS - 1) {
-          return false;
-        }
-      }
-      return true;
-    }
-
-    let largestOther = 0;
-    for (let y = 0; y < this.ROWS; y++) {
-      for (let x = 0; x < this.COLS; x++) {
-        const k = key(x, y);
-        if (visited.has(k) || isBlocked(x, y)) {
-          continue;
-        }
-        const sz = floodSize(x, y, visited);
-        if (sz > largestOther) {
-          largestOther = sz;
-        }
-      }
-    }
-    return foodSize < largestOther;
   }
 
   /**
@@ -2133,9 +1960,7 @@ class SnakeGame {
     // eslint-disable-next-line unicorn/no-array-for-each -- SnakeBody#forEach, not Array#forEach
     this.snake.forEach((seg, i) => {
       let key = this._getSegmentTileKey(i);
-      if (this.state === STATE.IGNORED) {
-        key += '_i';
-      } else if (this.state === STATE.WARNING) {
+      if (this.state === STATE.WARNING) {
         key += '_w';
       } else if (i === 0 && this.input.speedBoostActive) {
         key += '_b';
@@ -2181,7 +2006,7 @@ class SnakeGame {
   }
 
   /**
-   * Creates all pre-rendered off-screen canvas tiles (46 total: 3 full
+   * Creates all pre-rendered off-screen canvas tiles (32 total: 2 full
    * palette sets × 14 shapes + 4 boost head tiles).
    *
    * @private
@@ -2190,7 +2015,6 @@ class SnakeGame {
     const sets = [
       { palette: this.colors.paletteNormal, suffix: '' },
       { palette: this.colors.paletteWarning, suffix: '_w' },
-      { palette: this.colors.paletteIgnored, suffix: '_i' },
     ];
 
     this.tiles = {};
@@ -2324,42 +2148,8 @@ class SnakeGame {
   }
 
   /**
-   * Processes a single turn in constrictor mode: handles head-food poofing,
-   * auto-growth, growth, enclosure-based eating of regular and bonus food.
-   *
-   * @private
-   * @param {Point} head The current head position.
-   */
-  _processConstrictorTurn(head) {
-    if (head.x === this.food.x && head.y === this.food.y) {
-      if (this.snake.length >= this.freeTiles) {
-        this._gameOver();
-        return;
-      }
-      this._placeFood();
-    }
-
-    if (this.startGrowth > 0) {
-      this.startGrowth--;
-    } else if (this.growth > 0) {
-      this.growth--;
-    } else {
-      this.snake.pop();
-    }
-
-    if (this._isFoodEnclosed(this.food)) {
-      this._eatRegularFood();
-      if (this.state === STATE.OVER) return;
-    }
-
-    if (this.bonusFood.isEnclosed()) {
-      this._eatBonusFood();
-    }
-  }
-
-  /**
-   * Processes a single turn in classic/time-trial modes: handles regular food
-   * eating, growth, tail popping, and bonus food head collision.
+   * Processes a single turn: handles regular food eating, growth, tail
+   * popping, and bonus food head collision.
    *
    * @private
    * @param {Point} head The current head position.
@@ -2394,11 +2184,7 @@ class SnakeGame {
       return;
     }
     this.snake.unshift(nextHead);
-    if (this.options.mode === MODE_CONSTRICTOR) {
-      this._processConstrictorTurn(nextHead);
-    } else {
-      this._processClassicTurn(nextHead);
-    }
+    this._processClassicTurn(nextHead);
   }
 
   /**
@@ -2486,27 +2272,8 @@ class SnakeGame {
   }
 
   /**
-   * Enters the ignored state (constrictor self-collision). Clears the game
-   * loop and all bonus-food timers, displays a prompt, and waits for a
-   * safe direction input.
-   *
-   * @private
-   */
-  _enterIgnored() {
-    this._stopLoop();
-    this.bonusFood.clearAllTimers();
-    this.scoreBonus.clearTimers();
-    this.input.resetBoost();
-    this._transitionTo(STATE.IGNORED);
-    this.input.clearBuffer();
-    this.messageElement.textContent = MSG_SNAKE_STUCK;
-    this._draw();
-  }
-
-  /**
    * Starts the game from the WAITING state. Transitions to PLAYING, records
    * the start time, starts the game loop and all periodic timers.
-   * In constrictor mode, sets auto-growth (14 ticks).
    *
    * @private
    */
@@ -2515,9 +2282,6 @@ class SnakeGame {
     this._transitionTo(STATE.PLAYING);
     this.startTime = Date.now() - this.elapsed;
     this.messageElement.textContent = '';
-    if (this.options.mode === MODE_CONSTRICTOR) {
-      this.startGrowth = 14;
-    }
     this._startLoop(performance.now());
     this.timers.setInterval('timerInterval', () => this._updateTimerDisplay(), 1000);
     this.scoreBonus.resumeDecay();
@@ -2546,7 +2310,7 @@ class SnakeGame {
    * @private
    */
   _pauseGame() {
-    if (this.state !== STATE.PLAYING && this.state !== STATE.WARNING && this.state !== STATE.IGNORED) return;
+    if (this.state !== STATE.PLAYING && this.state !== STATE.WARNING) return;
     this.wasPaused = true;
     this._stopLoop();
     this._clearAllTimers();
@@ -2558,7 +2322,7 @@ class SnakeGame {
 
   /**
    * Resumes the game after pause (canvas focus). Restores timers for the
-   * current state (PLAYING, WARNING, or IGNORED).
+   * current state (PLAYING or WARNING).
    *
    * @private
    */
@@ -2590,14 +2354,6 @@ class SnakeGame {
 
         break;
       }
-      case STATE.IGNORED: {
-        this.timers.setInterval('timerInterval', () => this._updateTimerDisplay(), 1000);
-        this._resumeCommonTimers();
-        this.bonusFood.startTimers();
-        this.wormholes.startTimers();
-
-        break;
-      }
       // No default
     }
     this.overlay.textContent = MSG_CLICK_OR_TAP_TO_FOCUS;
@@ -2621,7 +2377,7 @@ class SnakeGame {
    * @private
    */
   _enterUnfocused() {
-    if (this.state !== STATE.PLAYING && this.state !== STATE.WARNING && this.state !== STATE.IGNORED) return;
+    if (this.state !== STATE.PLAYING && this.state !== STATE.WARNING) return;
     this._previousState = this.state;
     this._transitionTo(STATE.UNFOCUSED);
     this._stopLoop();
@@ -2670,14 +2426,6 @@ class SnakeGame {
 
         break;
       }
-      case STATE.IGNORED: {
-        this.timers.setInterval('timerInterval', () => this._updateTimerDisplay(), 1000);
-        this._resumeCommonTimers();
-        this.bonusFood.startTimers();
-        this.wormholes.startTimers();
-
-        break;
-      }
       // No default
     }
     this.canvas.focus();
@@ -2699,10 +2447,6 @@ class SnakeGame {
       }
       case STATE.WARNING: {
         this._handleInputWarning(dir);
-        break;
-      }
-      case STATE.IGNORED: {
-        this._handleInputIgnored(dir);
         break;
       }
       case STATE.PLAYING: {
@@ -2751,26 +2495,6 @@ class SnakeGame {
     this.input.resetBoost();
     this._startLoop(performance.now());
     this.bonusFood.resumeMovementTimers();
-  }
-
-  /**
-   * Handles input in IGNORED state: checks if the direction avoids collision,
-   * and if so, escapes the ignored state and resumes play.
-   *
-   * @private
-   * @param {Point} dir The direction input.
-   */
-  _handleInputIgnored(dir) {
-    const newHead = this.boundary.wrap({ x: this.snake.head().x + dir.x, y: this.snake.head().y + dir.y });
-    const c = this.collision.getCollision(newHead);
-    if (c.wall || c.boundary || c.self) return;
-    this.input.clearBuffer();
-    this.input.direction = dir;
-    this.input.nextDirection = dir;
-    this._transitionTo(STATE.PLAYING);
-    this.messageElement.textContent = '';
-    this._startLoop(performance.now());
-    this._resumeCommonTimers();
   }
 
   /**

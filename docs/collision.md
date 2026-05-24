@@ -1,6 +1,6 @@
 # Collision
 
-`CollisionResolver` detects wall, boundary, and self-collisions and routes them through grace period, ignored state, or game over logic.
+`CollisionResolver` detects wall, boundary, and self-collisions and routes them through grace period or game over logic.
 
 ## Collision Types
 
@@ -23,22 +23,10 @@ When a collision is detected and grace period is enabled:
 
 When disabled, any collision triggers immediate game over.
 
-## Constrictor Self-Collision (Ignored State)
-
-In constrictor mode, self-collision routes to the `ignored` state instead of triggering warning or game over:
-
-1. Snake freezes and turns magenta (ignored palette)
-2. The rAF loop is stopped and all timers (bonus food, score decay) are cleared
-3. The prompt "Snake stuck — press a safe direction" appears
-4. If a safe direction exists and the player presses it, the game resumes
-5. If **no** safe direction exists (all four adjacent cells are blocked), game over is triggered immediately via `hasAnySafeMove()`
-
-Grace period has no effect on self-collision in constrictor mode.
-
 ## Safe Move Checking
 
-`isDirSafe()` checks whether moving in a given direction from the snake's head would avoid all three collision types. `hasAnySafeMove()` checks all four cardinal directions and returns `true` if at least one is clear. Both respect wrap when enabled.
+`isDirSafe()` checks whether moving in a given direction from the snake's head would avoid all three collision types. Both respect wrap when enabled.
 
 ## Board-Full Detection
 
-After eating food, `snake.length` is compared against `freeTiles` (total cells minus wall count). If the snake fills all playable tiles, game over triggers immediately — bypassing grace period and ignored state.
+After eating food, `snake.length` is compared against `freeTiles` (total cells minus wall count). If the snake fills all playable tiles, game over triggers immediately — bypassing grace period.

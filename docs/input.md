@@ -17,7 +17,6 @@ Input is routed based on game state:
 - **`waiting`**: Sets direction and starts the game
 - **`playing`**: Delegates to `InputManager.handlePlayingInput()` for buffering/boost/instant logic
 - **`warning`**: Checks if the direction avoids collision; if safe, escapes the warning and resumes
-- **`ignored`**: Same safety check; if safe, escapes the ignored state and resumes
 - **`unfocused`**: All direction input is ignored (no-op). Tap/click on the overlay triggers resume.
 - **`over`**: Space/tap restarts
 

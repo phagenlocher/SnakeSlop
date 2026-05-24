@@ -26,10 +26,9 @@ Each tile shape is rendered with multiple palettes for different visual states:
 | ------ | ------------------------------- | -------------------------------------- |
 | (none) | `paletteNormal` (green)         | `playing` state                        |
 | `_w`   | `paletteWarning` (red)          | `warning` / grace period               |
-| `_i`   | `paletteIgnored` (magenta)      | `ignored` / constrictor self-collision |
 | `_b`   | `paletteBoost` (goldenrod head) | Speed boost active (head tiles only)   |
 
-This produces ~51 total tiles: 14 snake shapes × 3 full palettes (42) + 4 boost heads + 5 static tiles.
+This produces ~37 total tiles: 14 snake shapes × 2 full palettes (28) + 4 boost heads + 5 static tiles.
 
 ### Segment Tile Selection
 

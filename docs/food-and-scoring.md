@@ -2,15 +2,11 @@
 
 ## Regular Food
 
-A red circle placed at a random valid grid position. Avoids snake body, wall cells, wormhole entry cells, and (in constrictor mode) enclosed regions (max 200 retries, falls back to any free tile).
+A red circle placed at a random valid grid position. Avoids snake body, wall cells, and wormhole entry cells.
 
-### Eating (Classic / Time Trial / Time Seeker)
+### Eating
 
 Head collides with food: awards 10 pts + current score bonus value, increments `foodsEaten`, sets `growth = 1` (snake grows by 1 next tick). Triggers speed recalculation and bonus food spawn check.
-
-### Eating (Constrictor)
-
-Head hitting food has no effect — it just disappears and respawns. Only **enclosure** eating counts: see [Game Modes](game-modes.md) for the flood-fill algorithm.
 
 ## Bonus Food
 
@@ -32,13 +28,10 @@ Avoids snake body, wall cells, and wormhole entry cells. Bonus food also won't m
 - Moves one step in a random cardinal direction every `currentSpeed + 60`ms
 - Respects wrap boundaries; won't move onto wall cells
 - Auto-expires after 5 seconds
-- In constrictor mode: checks if its position is enclosed each move step
 
 ### Eating
 
-- **Classic / Time Trial**: Head collision awards 100 pts and optionally halves snake length (`enableShrinkOnBonusFood`)
-- **Time Seeker**: Head collision awards 100 pts, optionally halves snake length, and **adds up to 10 seconds** to the countdown timer (capped at 2:00)
-- **Constrictor**: Enclosure-based eating awards 100 pts and optionally halves snake length (capped at minimum 15)
+- **Classic / Time Trial / Time Seeker**: Head collision awards 100 pts and optionally halves snake length (`enableShrinkOnBonusFood`)
 
 When shrink is enabled, `SnakeBody.splice()` removes the tail half of segments. Growth counter is unaffected.
 
@@ -59,6 +52,6 @@ When `enableScoreBonus` is disabled, no bonus is added and no suffix is rendered
 The HUD bar displays:
 
 - **Score**: Running total with optional `+N` bonus suffix, updated on each food eaten
-- **Time**: `M:SS` format, counting up (classic/constrictor) or down (time trial / time seeker)
+- **Time**: `M:SS` format, counting up (classic) or down (time trial / time seeker)
 
 On small screens (< 510px), the HUD stacks vertically below the canvas.
