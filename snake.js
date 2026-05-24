@@ -1890,7 +1890,8 @@ class SnakeGame {
       this.freeTiles -= this.walls.count;
     }
     this.scoreElement.textContent = 'Score: 0';
-    this.timerElement.textContent = (this.options.mode === MODE_TIME_TRIAL || this.options.mode === MODE_TIME_SEEKER) ? 'Time: 2:00' : 'Time: 0:00';
+    this.timerElement.textContent =
+      this.options.mode === MODE_TIME_TRIAL || this.options.mode === MODE_TIME_SEEKER ? 'Time: 2:00' : 'Time: 0:00';
     this.messageElement.textContent = MSG_USE_ARROW_KEYS_TO_START;
     this.overlay.textContent = MSG_CLICK_OR_TAP_TO_FOCUS;
     this._placeFood();
