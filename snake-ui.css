@@ -59,6 +59,10 @@ body {
   height: 20px;
   cursor: pointer;
 }
+.snake-toggle-grid input[type='checkbox']:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
 .snake-features-details summary {
   font-size: 20px;
   letter-spacing: 1px;

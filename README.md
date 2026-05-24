@@ -14,6 +14,7 @@ Open `index.html` in any browser to play.
 | ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | Classic     | Standard Snake. Timer counts up, no time limit. Game over on collision or when the board is completely filled.                                                                                                                                                                                                                                                                                                                             |
 | Time Trial  | Race against the clock. Timer counts down from 2:00. Game over when time runs out, on collision, or when the board is completely filled. All Classic rules apply.                                                                                                                                                                                                                                                                          |
+| Time Seeker | Like Time Trial, but bonus food adds up to +10 seconds to the countdown (capped at 2:00). Bonus food is always enabled. |
 | Constrictor | Food is eaten by enclosure, not head collision. Snake auto-grows to length 15 at start, then grows by 1 on each enclosure eat. Self-collision enters an `ignored` state (snake freezes, waits for a safe direction). Head passing over food poofs it away (no score/growth). Bonus food also enclosure-only and shrinks the snake (halved, minimum 15). All Classic rules apply except self-collision uses `ignored` instead of game over. |
 
 ## Togglable Features
@@ -80,7 +81,7 @@ Pass any of these as the second argument to `new SnakeGame(container, options)`:
 
 | Option                     | Type      | Default | Description                                                    |
 | -------------------------- | --------- | ------- | -------------------------------------------------------------- |
-| `mode`                     | `string`  | `"classic"` | Game mode: `"classic"`, `"timeTrial"`, or `"constrictor"`      |
+| `mode`                     | `string`  | `"classic"` | Game mode: `"classic"`, `"timeTrial"`, `"timeSeeker"`, or `"constrictor"`      |
 | `enableBonusFood`          | `boolean` | `true`  | Golden diamond bonus food                                      |
 | `enableGracePeriod`        | `boolean` | `true`  | 1-second warning before collision                              |
 | `enableShrinkOnBonusFood`  | `boolean` | `true`  | Halve snake length on bonus food                               |

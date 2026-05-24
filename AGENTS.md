@@ -1,6 +1,6 @@
 # Snake Game
 
-Multi-file vanilla HTML/CSS/JS Snake game rendered on an HTML5 Canvas. Features 3 game modes (Classic, Time Trial, Constrictor) and 12 togglable feature flags.
+Multi-file vanilla HTML/CSS/JS Snake game rendered on an HTML5 Canvas. Features 4 game modes (Classic, Time Trial, Time Seeker, Constrictor) and 13 togglable feature flags.
 
 ## Run
 
@@ -18,7 +18,7 @@ Detailed documentation for each aspect of the codebase lives in `docs/`:
 | -------------------------------------------- | --------------------------------------------------------------------------- |
 | [architecture](docs/architecture.md)         | Code organization, manager classes, dependency injection, file structure    |
 | [state-machine](docs/state-machine.md)       | Five game states, validated transitions, lifecycle from init to game over   |
-| [game-modes](docs/game-modes.md)             | Classic, Time Trial, and Constrictor mode behavior differences              |
+| [game-modes](docs/game-modes.md)             | Classic, Time Trial, Time Seeker, and Constrictor mode behavior differences              |
 | [rendering](docs/rendering.md)               | Pre-rendered tile system, color themes, responsive canvas sizing            |
 | [input](docs/input.md)                       | Keyboard, touch/swipe, input buffering, speed boost, instant movement       |
 | [collision](docs/collision.md)               | Wall/boundary/self collision, grace period, constrictor ignored state       |

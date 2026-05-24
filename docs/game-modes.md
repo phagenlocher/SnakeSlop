@@ -1,6 +1,6 @@
 # Game Modes
 
-Three modes selected via dropdown. All feature toggles apply identically across all modes.
+Four modes selected via dropdown. All feature toggles apply identically across all modes.
 
 ## Classic (`mode: 'classic'`)
 
@@ -18,6 +18,16 @@ Race against a 2-minute countdown.
 - **Game over**: Time expiry OR any classic collision OR board full.
 - **Eating**: Identical to Classic (head-collision based).
 - All classic features (grace period, speed boost, bonus food, walls, wrap, wormholes) function identically.
+
+## Time Seeker (`mode: 'timeSeeker'`)
+
+A variant of Time Trial where bonus food extends the clock.
+
+- **Timer**: Counts down from `2:00`. Reaching `0:00` triggers game over.
+- **Bonus food**: Always enabled (toggle is forced on). Eating bonus food adds **up to +10 seconds**, capped at the original 2:00 limit.
+- **Game over**: Time expiry OR any classic collision OR board full.
+- **Eating**: Identical to Classic (head-collision based).
+- All classic features (grace period, speed boost, walls, wrap, wormholes) function identically.
 
 ## Constrictor (`mode: 'constrictor'`)
 

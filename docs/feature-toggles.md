@@ -26,3 +26,4 @@ All 13 toggles are controlled via checkboxes, persisted to `localStorage` under 
 - `enableGracePeriod` has no effect on constrictor self-collision (which always enters `ignored`)
 - `enableInputBuffer` and `enableInstantMovement` compose naturally — buffer provides validation, instant moves consume buffer entries
 - `enableFaultFilter` composes with `enableInputBuffer` (filters buffered directions at commit time) and with `enableInstantMovement` (prevents instant tick from committing an unsafe direction)
+- When `mode === 'timeSeeker'`, `enableBonusFood` is forced `true` and its toggle is disabled in the UI

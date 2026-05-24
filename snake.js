@@ -101,6 +101,8 @@ const MODE_CLASSIC = 'classic';
 const MODE_TIME_TRIAL = 'timeTrial';
 /** @type {string} Constrictor mode — food eaten by enclosure. */
 const MODE_CONSTRICTOR = 'constrictor';
+/** @type {string} Time-seeker mode — like time trial but bonus food adds +10s. */
+const MODE_TIME_SEEKER = 'timeSeeker';
 
 /** @enum {string} Game state constants. */
 const STATE = Object.freeze({
@@ -173,6 +175,8 @@ const WARNING_TIMEOUT_MS = 700;
 const BONUS_FOOD_LIFETIME_MS = 5000;
 /** @constant {number} Bonus food spawn interval in ms (timed mode). */
 const BONUS_FOOD_SPAWN_INTERVAL_MS = 15_000;
+/** @constant {number} Time added by bonus food in Time Seeker mode in ms. */
+const BONUS_TIME_MS = 10_000;
 /** @constant {number} Score bonus decay interval in ms. */
 const SCORE_BONUS_DECAY_INTERVAL_MS = 200;
 
@@ -1577,7 +1581,7 @@ class SnakeGame {
   /**
    * @param {HTMLElement} container The DOM element to mount the game into.
    * @param {object} [options={}] Feature toggles and mode selector.
-   * @param {string} [options.mode='classic'] Game mode: 'classic', 'timeTrial', or 'constrictor'.
+   * @param {string} [options.mode='classic'] Game mode: 'classic', 'timeTrial', 'constrictor', or 'timeSeeker'.
    * @param {boolean} [options.enableBonusFood=true] Enable golden diamond bonus food.
    * @param {boolean} [options.enableGracePeriod=true] Enable 1-second warning before collision.
    * @param {boolean} [options.enableShrinkOnBonusFood=true] Halve snake length on bonus food.
@@ -1612,6 +1616,9 @@ class SnakeGame {
       enableWormholes: options.enableWormholes === undefined ? true : options.enableWormholes,
       enableColorblindMode: options.enableColorblindMode === undefined ? false : options.enableColorblindMode,
     };
+    if (this.options.mode === MODE_TIME_SEEKER) {
+      this.options.enableBonusFood = true;
+    }
 
     /** @type {number} Number of grid columns. */
     this.COLS = 20;
@@ -1883,7 +1890,7 @@ class SnakeGame {
       this.freeTiles -= this.walls.count;
     }
     this.scoreElement.textContent = 'Score: 0';
-    this.timerElement.textContent = this.options.mode === MODE_TIME_TRIAL ? 'Time: 2:00' : 'Time: 0:00';
+    this.timerElement.textContent = (this.options.mode === MODE_TIME_TRIAL || this.options.mode === MODE_TIME_SEEKER) ? 'Time: 2:00' : 'Time: 0:00';
     this.messageElement.textContent = MSG_USE_ARROW_KEYS_TO_START;
     this.overlay.textContent = MSG_CLICK_OR_TAP_TO_FOCUS;
     this._placeFood();
@@ -2052,6 +2059,12 @@ class SnakeGame {
     if (result.shrinkBy > 0) {
       this.snake.splice(result.shrinkBy);
     }
+    if (this.options.mode === MODE_TIME_SEEKER) {
+      const remaining = Math.max(0, this.TIME_LIMIT - (Date.now() - this.startTime));
+      const delta = Math.min(BONUS_TIME_MS, this.TIME_LIMIT - remaining);
+      this.startTime += delta;
+      this._updateTimerDisplay();
+    }
   }
 
   /**
@@ -2070,7 +2083,7 @@ class SnakeGame {
    */
   _updateTimerDisplay() {
     this.elapsed = Date.now() - this.startTime;
-    if (this.options.mode === MODE_TIME_TRIAL) {
+    if (this.options.mode === MODE_TIME_TRIAL || this.options.mode === MODE_TIME_SEEKER) {
       const remaining = Math.max(0, this.TIME_LIMIT - this.elapsed);
       const secs = Math.floor(remaining / 1000);
       this.timerElement.textContent = `Time: ${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, '0')}`;

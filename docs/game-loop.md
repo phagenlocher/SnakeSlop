@@ -10,7 +10,7 @@ Each physics tick executes in this order:
 2. **Resolve head** — computes new head position, applies wrap, checks wormhole teleport
 3. **Process collision** — checks wall/boundary/self; routes to warning, ignored, or game over
 4. **Advance snake** — `unshift` new head at front
-5. **Mode-specific logic** — classic/time-trial food eating + growth, or constrictor enclosure checks + auto-growth
+5. **Mode-specific logic** — classic/time-trial/time-seeker food eating + growth, or constrictor enclosure checks + auto-growth
 
 If collision handling changes state away from `playing`, the remaining steps in the pipeline are skipped.
 
@@ -69,3 +69,4 @@ A 1-second interval updates the HUD timer display:
 
 - **Classic/Constrictor**: Counts up from `0:00` as `M:SS`
 - **Time Trial**: Counts down from `2:00` as `M:SS`; triggers game over at `0:00`
+- **Time Seeker**: Counts down from `2:00` as `M:SS`; eating bonus food adds up to +10 seconds (capped at 2:00)

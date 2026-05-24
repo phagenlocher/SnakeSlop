@@ -26,6 +26,7 @@ Source: https://github.com/phagenlocher/SnakeSlop
           <select class="snake-mode-select">
             <option value="classic">Classic</option>
             <option value="timeTrial">Time Trial</option>
+            <option value="timeSeeker">Time Seeker</option>
             <option value="constrictor">Constrictor</option>
           </select>
         </label>
@@ -137,6 +138,14 @@ Source: https://github.com/phagenlocher/SnakeSlop
 
       let game = null;
 
+      function updateToggleStates() {
+        const isTimeSeeker = modeSelect.value === 'timeSeeker';
+        toggleBonusFood.disabled = isTimeSeeker;
+        if (isTimeSeeker) {
+          toggleBonusFood.checked = true;
+        }
+      }
+
       function saveSettings() {
         const settings = {
           mode: modeSelect.value,
@@ -181,6 +190,7 @@ Source: https://github.com/phagenlocher/SnakeSlop
         } catch (_) {
           // corrupted or missing → use HTML defaults
         }
+        updateToggleStates();
       }
 
       function mountGame() {
@@ -205,10 +215,14 @@ Source: https://github.com/phagenlocher/SnakeSlop
           enableColorblindMode: toggleColorblind.checked,
         });
         document.body.classList.toggle('snake-colorblind', toggleColorblind.checked);
+        updateToggleStates();
         saveSettings();
       }
 
-      modeSelect.addEventListener('change', mountGame);
+      modeSelect.addEventListener('change', () => {
+        updateToggleStates();
+        mountGame();
+      });
       toggleBonusFood.addEventListener('change', mountGame);
       toggleGracePeriod.addEventListener('change', mountGame);
       toggleShrink.addEventListener('change', mountGame);
