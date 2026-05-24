@@ -2724,6 +2724,7 @@ class SnakeGame {
    * @param {Point} dir The direction input.
    */
   _handleInputWarning(dir) {
+    if (dir.x === -this.input.graceDirection.x && dir.y === -this.input.graceDirection.y) return;
     const newHead = this.boundary.wrap({ x: this.snake.head().x + dir.x, y: this.snake.head().y + dir.y });
     const c = this.collision.getCollision(newHead);
     if (c.wall || c.boundary || c.self) return;
