@@ -1609,7 +1609,7 @@ class SnakeGame {
       enableWrap: options.enableWrap === undefined ? true : options.enableWrap,
       enableSpeedBoost: options.enableSpeedBoost === undefined ? true : options.enableSpeedBoost,
       enableInputBuffer: options.enableInputBuffer === undefined ? true : options.enableInputBuffer,
-      enableFaultFilter: options.enableFaultFilter === undefined ? false : options.enableFaultFilter,
+      enableFaultFilter: options.enableFaultFilter === undefined ? true : options.enableFaultFilter,
       enableInstantMovement: options.enableInstantMovement === undefined ? true : options.enableInstantMovement,
       enableTimedBonusFood: options.enableTimedBonusFood === undefined ? true : options.enableTimedBonusFood,
       enableWalls: options.enableWalls === undefined ? true : options.enableWalls,

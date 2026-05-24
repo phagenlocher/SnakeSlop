@@ -90,14 +90,14 @@ Pass any of these as the second argument to `new SnakeGame(container, options)`:
 | `enableWrap`               | `boolean` | `true`  | Wrap-around boundaries                                         |
 | `enableSpeedBoost`         | `boolean` | `true`  | Same-direction keypress boosts speed                           |
 | `enableInputBuffer`        | `boolean` | `true`  | Buffer up to 2 rapid inputs                                    |
-| `enableFaultFilter`        | `boolean` | `false` | Block unsafe direction inputs (wall/boundary/self)            |
+| `enableFaultFilter`        | `boolean` | `true`  | Block unsafe direction inputs (wall/boundary/self)            |
 | `enableInstantMovement`    | `boolean` | `true`  | Move immediately on keypress                                   |
 | `enableTimedBonusFood`     | `boolean` | `true`  | Spawn bonus food every 15s                                     |
 | `enableWalls`              | `boolean` | `true`  | Wall ring inside arena                                         |
 | `enableWormholes`          | `boolean` | `true`  | Wormhole teleport pairs                                        |
 | `enableColorblindMode`     | `boolean` | `false` | Bang Wong colorblind-friendly palette                          |
 
-All options default to `true` except `mode` (`"classic"`), `enableColorblindMode` (`false`), and `enableFaultFilter` (`false`). Omitted options fall back to these defaults.
+All options default to `true` except `mode` (`"classic"`) and `enableColorblindMode` (`false`). Omitted options fall back to these defaults.
 
 ## License
 

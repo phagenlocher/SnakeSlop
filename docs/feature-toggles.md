@@ -1,6 +1,6 @@
 # Feature Toggles
 
-All 13 toggles are controlled via checkboxes, persisted to `localStorage` under key `snake-game-settings`. The game is destroyed and remounted whenever a toggle changes. All default to `true` except `enableColorblindMode` and `enableFaultFilter`.
+All 13 toggles are controlled via checkboxes, persisted to `localStorage` under key `snake-game-settings`. The game is destroyed and remounted whenever a toggle changes. All default to `true` except `enableColorblindMode`.
 
 | Toggle                    | Default | Effect                                                                                        |
 | ------------------------- | ------- | --------------------------------------------------------------------------------------------- |
@@ -13,7 +13,7 @@ All 13 toggles are controlled via checkboxes, persisted to `localStorage` under 
 | `enableSpeedUp`           | `true`  | Tick rate accelerates with each food eaten (135ms → 50ms floor)                               |
 | `enableSpeedBoost`        | `true`  | Same-direction keypress multiplies speed by 1.35                                              |
 | `enableInputBuffer`       | `true`  | Queues up to 2 rapid direction inputs so none are lost between ticks                          |
-| `enableFaultFilter`       | `false` | Filters out direction inputs that would immediately cause wall, boundary, or self collision   |
+| `enableFaultFilter`       | `true`  | Filters out direction inputs that would immediately cause wall, boundary, or self collision   |
 | `enableInstantMovement`   | `true`  | Snake moves immediately on valid keypress instead of waiting for next tick                    |
 | `enableWalls`             | `true`  | Renders 44 wall cells as a hollow square ring with collision                                  |
 | `enableWormholes`         | `true`  | Spawns teleport entry/exit pairs every 30 seconds                                             |
