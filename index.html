@@ -143,6 +143,8 @@ Source: https://github.com/phagenlocher/SnakeSlop
         if (isTimeSeeker) {
           toggleBonusFood.checked = true;
         }
+        toggleTimedBonus.disabled = !toggleBonusFood.checked;
+        toggleShrink.disabled = !toggleBonusFood.checked;
       }
 
       function saveSettings() {

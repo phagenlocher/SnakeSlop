@@ -21,7 +21,7 @@ All 13 toggles are controlled via checkboxes, persisted to `localStorage` under 
 
 ## Dependencies
 
-- `enableTimedBonusFood` and `enableShrinkOnBonusFood` depend on `enableBonusFood` being enabled
+- `enableTimedBonusFood` and `enableShrinkOnBonusFood` depend on `enableBonusFood` being enabled; their toggles are disabled in the UI when `enableBonusFood` is unchecked
 - `enableWrap` overrides boundary collision (walls remain solid)
 - `enableInputBuffer` and `enableInstantMovement` compose naturally — buffer provides validation, instant moves consume buffer entries
 - `enableFaultFilter` composes with `enableInputBuffer` (filters buffered directions at commit time) and with `enableInstantMovement` (prevents instant tick from committing an unsafe direction)
